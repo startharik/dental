@@ -75,6 +75,7 @@ export interface FileDetectionState {
   result?: DicomDetectionResult;
   error?: Error;
   diagnosticReport?: DiagnosticReport;
+  researchAnalysis?: ResearchAnalysis;
 }
 
 export interface DetectionProgress {
@@ -94,6 +95,87 @@ export interface DiagnosticReport {
   uncertainty_and_limitations: string;
   suggested_assessments: SuggestedClinicalAssessment[];
   generated_at: string;
+}
+
+export interface ResearchDifferential {
+  diagnosis: string;
+  supporting_evidence: string;
+  evidence_against_or_missing: string;
+}
+
+export interface ResearchDentistAnnotation {
+  detection_id: string;
+  review_status: ClinicalFindingReviewStatus;
+  dentist_label?: string;
+  assigned_tooth?: string;
+}
+
+export interface ResearchFindingAnalysis {
+  detection_id: string;
+  finding_name: string;
+  model_confidence: number;
+  anatomical_location: string;
+  possible_diagnosis: string;
+  differential_diagnoses: ResearchDifferential[];
+  ai_interpretation: string;
+  clinical_significance: string;
+  recommended_investigations: string[];
+  potential_treatment_options: string[];
+  follow_up: string;
+  evidence_and_limitations: string[];
+  related_detection_ids: string[];
+  dentist_annotation_comparison: string;
+}
+
+export interface ResearchAnalysis {
+  research_mode: string;
+  model: string;
+  generated_at: string;
+  findings: ResearchFindingAnalysis[];
+  combined_clinical_interpretation: string;
+  cross_finding_patterns: string[];
+  source_scope: string;
+  limitations: string;
+}
+
+export interface ResearchModeStatus {
+  enabled: boolean;
+  provider: string;
+  model: string;
+}
+
+export interface ResearchAnalysisRequest {
+  predictions: Detection[];
+  raw_predictions: Detection[];
+  image_info: ImageInfo;
+  modality?: string;
+  image_data_url: string;
+  dentist_annotations: ResearchDentistAnnotation[];
+  share_consent: boolean;
+}
+
+export interface ResearchAnalysisResponse {
+  analysis: ResearchAnalysis;
+  model_predictions: Detection[];
+}
+
+export type ClinicalFindingReviewStatus =
+  | "awaiting_review"
+  | "confirmed"
+  | "modified"
+  | "not_applicable";
+
+export interface ClinicalFindingReview {
+  status: ClinicalFindingReviewStatus;
+  modifiedLabel?: string;
+  toothNumber?: string;
+  observations: string;
+}
+
+export interface ClinicalReviewDraft {
+  findings: Record<string, ClinicalFindingReview>;
+  finalImpression: string;
+  savedAt?: string;
 }
 
 export type DiagnosticReportRequest = DicomDetectionResponse;

@@ -1,6 +1,10 @@
 "use client";
 import { useDroppedFilesStore } from "@/lib/store";
-import { DetectionProgress, DiagnosticReport } from "@/lib/types";
+import {
+  DetectionProgress,
+  DiagnosticReport,
+  ResearchAnalysis,
+} from "@/lib/types";
 import { ResultTabs } from "./result-tabs";
 import { ResultCard } from "./result-card";
 import { StatusBadges } from "./status-indicator";
@@ -8,11 +12,16 @@ import { StatusBadges } from "./status-indicator";
 interface PredictionResultsProps {
   detectionProgress: DetectionProgress;
   onReportGenerated?: (fileId: string, report: DiagnosticReport) => void;
+  onResearchAnalysisGenerated?: (
+    fileId: string,
+    analysis: ResearchAnalysis
+  ) => void;
 }
 
 export function PredictionResults({
   detectionProgress,
   onReportGenerated,
+  onResearchAnalysisGenerated,
 }: PredictionResultsProps) {
   const { files } = useDroppedFilesStore();
   const { files: fileStates } = detectionProgress;
@@ -50,6 +59,7 @@ export function PredictionResults({
               fileState={fileState}
               fileData={fileData}
               onReportGenerated={onReportGenerated}
+              onResearchAnalysisGenerated={onResearchAnalysisGenerated}
             />
           );
         })}

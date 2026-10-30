@@ -1,5 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
+from pydantic import SecretStr, field_validator
+from typing import Literal
 
 
 class Settings(BaseSettings):
@@ -9,6 +11,20 @@ class Settings(BaseSettings):
 
     # Model configuration
     default_model_id: str = "p_fase_1_v2/4"
+    research_provider: Literal["groq", "gemini"] = "groq"
+    groq_api_key: SecretStr | None = None
+    groq_research_model: str = "qwen/qwen3.8-27b"
+    google_api_key: SecretStr | None = None
+    google_research_model: str = "gemini-flash-latest"
+
+    @field_validator("groq_api_key", "google_api_key", mode="before")
+    @classmethod
+    def empty_research_key_is_unconfigured(
+        cls, value: str | SecretStr | None
+    ) -> str | SecretStr | None:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     # File upload settings - Define constants clearly
     MAX_FILE_SIZE_MB: int = 10

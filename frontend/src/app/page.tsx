@@ -42,7 +42,11 @@ export default function Home() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { files, clearFiles } = useDroppedFilesStore();
   const dicomDetectionMutation = useDicomDetection();
-  const { detectionProgress, updateDiagnosticReport } = dicomDetectionMutation;
+  const {
+    detectionProgress,
+    updateDiagnosticReport,
+    updateResearchAnalysis,
+  } = dicomDetectionMutation;
   const hasAnalysis = detectionProgress.files.length > 0;
 
   const handlePredict = () => {
@@ -239,6 +243,7 @@ export default function Home() {
               <PredictionResults
                 detectionProgress={detectionProgress}
                 onReportGenerated={updateDiagnosticReport}
+                onResearchAnalysisGenerated={updateResearchAnalysis}
               />
             ) : (
               <div className="rounded-2xl border border-dashed border-[#d7e1eb] bg-white px-5 py-12 text-center">

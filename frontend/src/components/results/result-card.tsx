@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle, ChevronDown, Clock } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -19,27 +19,38 @@ import type {
   Detection,
   DetectionProgress,
   DiagnosticReport,
+  ResearchAnalysis,
 } from "@/lib/types";
 import { deduplicateDetections } from "@/lib/utils";
 import { getDetectionColor } from "@/lib/constants";
+
+const EMPTY_DETECTIONS: Detection[] = [];
 
 interface ResultCardProps {
   fileState: DetectionProgress["files"][number];
   fileData?: ConvertedDicomData;
   onReportGenerated?: (fileId: string, report: DiagnosticReport) => void;
+  onResearchAnalysisGenerated?: (
+    fileId: string,
+    analysis: ResearchAnalysis
+  ) => void;
 }
 
 export function ResultCard({
   fileState,
   fileData,
   onReportGenerated,
+  onResearchAnalysisGenerated,
 }: ResultCardProps) {
   const [activeView, setActiveView] = useState("analysis");
   const [selectedDetectionId, setSelectedDetectionId] = useState<
     string | undefined
   >();
-  const rawDetections = fileState.result?.predictions ?? [];
-  const { findings, suppressed } = deduplicateDetections(rawDetections);
+  const rawDetections = fileState.result?.predictions ?? EMPTY_DETECTIONS;
+  const { findings, suppressed } = useMemo(
+    () => deduplicateDetections(rawDetections),
+    [rawDetections]
+  );
 
   const handleReportGenerated = (report: DiagnosticReport) => {
     onReportGenerated?.(fileState.fileId, report);
@@ -310,15 +321,22 @@ export function ResultCard({
                   <TabsContent value="report" className="mt-4">
                     <DiagnosticReportComponent
                       predictions={findings}
+                      rawDetections={rawDetections}
                       metadata={fileState.result.metadata}
                       imageInfo={fileState.result.image_info}
                       report={fileState.diagnosticReport}
                       onReportGenerated={handleReportGenerated}
+                      researchAnalysis={fileState.researchAnalysis}
+                      onResearchAnalysisGenerated={(analysis) =>
+                        onResearchAnalysisGenerated?.(
+                          fileState.fileId,
+                          analysis
+                        )
+                      }
                       originalImageSrc={fileData?.dataUrl}
                       fileName={fileState.fileName}
                       onLocateFinding={(detectionId) => {
                         setSelectedDetectionId(detectionId);
-                        setActiveView("analysis");
                       }}
                     />
                   </TabsContent>

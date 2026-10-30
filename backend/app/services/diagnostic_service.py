@@ -72,20 +72,38 @@ _CLASS_ASSESSMENT_GUIDANCE = {
         "2D projection."
     ),
     "impacted": (
-        "Review the tooth's eruption status, angulation, depth, root "
-        "development, and relationship to adjacent teeth and visible "
-        "anatomical structures. Correlate with clinical examination and "
-        "eruption history. Use additional imaging only when clinically "
-        "indicated; the model label does not identify a tooth or establish "
-        "surgical risk."
+        "Next step: Confirm the marked region on the full-resolution image "
+        "and identify the tooth clinically. Assess eruption status, "
+        "angulation, depth, root development, and relationships to adjacent "
+        "teeth and visible anatomy; correlate with examination and eruption "
+        "history. Consider additional imaging only when clinically indicated "
+        "and needed for management. This model label alone does not confirm "
+        "impaction or establish surgical risk."
     ),
     "impaction": (
-        "Review the tooth's eruption status, angulation, depth, root "
-        "development, and relationship to adjacent teeth and visible "
-        "anatomical structures. Correlate with clinical examination and "
-        "eruption history. Use additional imaging only when clinically "
-        "indicated; the model label does not identify a tooth or establish "
-        "surgical risk."
+        "Next step: Confirm the marked region on the full-resolution image "
+        "and identify the tooth clinically. Assess eruption status, "
+        "angulation, depth, root development, and relationships to adjacent "
+        "teeth and visible anatomy; correlate with examination and eruption "
+        "history. Consider additional imaging only when clinically indicated "
+        "and needed for management. This model label alone does not confirm "
+        "impaction or establish surgical risk."
+    ),
+    "restoration": (
+        "Next step: Confirm that the marked region corresponds to a "
+        "restoration on the full-resolution image. Inspect its visible "
+        "margins and contour and assess adjacent tooth structure for a "
+        "separate radiolucency; correlate with clinical examination and "
+        "prior images when available. A restoration label alone does not "
+        "indicate recurrent caries or restoration failure."
+    ),
+    "root canal": (
+        "Next step: Confirm the marked tooth and whether the image shows "
+        "previous endodontic treatment. If treated, assess the visible canal "
+        "filling, periapical tissues, and coronal seal; compare prior images "
+        "and correlate with symptoms and clinical examination. This label "
+        "alone cannot establish treatment success or failure, or a need for "
+        "retreatment."
     ),
     "amalgam filling": (
         "Treat this as a possible restoration/material label, not a diagnosis. "
@@ -161,13 +179,15 @@ def _assessment_guidance(class_label: str) -> str:
 
     return (
         "No class-specific assessment guidance is configured for this label. "
-        "Do not infer a diagnosis or management plan from it; confirm the "
-        "model class definition and have a dentist interpret the source image."
+        "Next step: Verify the model's class definition, confirm the marked "
+        "region on the full-resolution image, and have a dentist interpret "
+        "the finding with clinical context. Do not infer a diagnosis or "
+        "management plan from this label."
     )
 
 
 class DiagnosticReportService:
-    """Create class-specific, non-diagnostic review prompts from detections."""
+    """Create class-specific, non-diagnostic next steps from detections."""
 
     async def generate_diagnostic_report(
         self, detections: List[Detection]
@@ -175,18 +195,15 @@ class DiagnosticReportService:
         assessments = [
             SuggestedClinicalAssessment(
                 detection_id=detection.detection_id,
-                suggestion=(
-                    f"Finding {index:02d} ({detection.class_}): "
-                    f"{_assessment_guidance(detection.class_)}"
-                ),
+                suggestion=_assessment_guidance(detection.class_),
             )
-            for index, detection in enumerate(detections, start=1)
+            for detection in detections
         ]
 
         return DiagnosticReport(
             uncertainty_and_limitations=(
-                "These class-specific prompts are for clinician review, not "
-                "diagnoses or treatment recommendations, and have not been "
+                "These class-specific next steps are for clinician review, "
+                "not diagnoses or treatment recommendations, and have not been "
                 "independently validated as a clinical protocol. Model scores "
                 "are not calibrated diagnostic probabilities; detections may "
                 "be false, missed, or duplicated, and no tooth number is "

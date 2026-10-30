@@ -10,11 +10,18 @@ from ..models.detection import (
     ErrorResponse,
     DiagnosticReportResponse,
     DiagnosticReportRequest,
+    ResearchAnalysisRequest,
+    ResearchAnalysisResponse,
+    ResearchModeStatus,
 )
 from ..services.inference_service import InferenceService, get_inference_service
 from ..services.diagnostic_service import (
     DiagnosticReportService,
     get_diagnostic_report_service,
+)
+from ..services.research_service import (
+    ResearchAnalysisService,
+    get_research_analysis_service,
 )
 from ..core.config import get_settings, Settings
 
@@ -222,7 +229,7 @@ async def generate_diagnostic_report_from_detections(
     """
     Generate a clinical review aid from actual inference results.
 
-    The generated assessment prompts are tied to the supplied detection IDs;
+    The generated clinician next steps are tied to the supplied detection IDs;
     no LLM-generated diagnosis or treatment advice is returned.
 
     This endpoint is designed to be called after /detect-dicom
@@ -248,6 +255,43 @@ async def generate_diagnostic_report_from_detections(
             status_code=500,
             detail="Clinical review aid generation failed. Check the backend logs.",
         )
+
+
+@router.get("/research-mode", response_model=ResearchModeStatus)
+async def get_research_mode_status(
+    research_service: Annotated[
+        ResearchAnalysisService, Depends(get_research_analysis_service)
+    ],
+) -> ResearchModeStatus:
+    return ResearchModeStatus(
+        enabled=research_service.is_enabled(),
+        provider=research_service.provider,
+        model=research_service.model_name,
+    )
+
+
+@router.post(
+    "/research-analysis",
+    response_model=ResearchAnalysisResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid research input"},
+        413: {"model": ErrorResponse, "description": "Image too large"},
+        502: {"model": ErrorResponse, "description": "External research provider failed"},
+        503: {"model": ErrorResponse, "description": "Research Mode is disabled"},
+    },
+)
+async def generate_research_analysis(
+    request: ResearchAnalysisRequest,
+    research_service: Annotated[
+        ResearchAnalysisService, Depends(get_research_analysis_service)
+    ],
+) -> ResearchAnalysisResponse:
+    """Run opt-in exploratory analysis on a de-identified/test image."""
+    analysis = await research_service.generate_analysis(request)
+    return ResearchAnalysisResponse(
+        analysis=analysis,
+        model_predictions=request.predictions,
+    )
 
 
 @router.get("/health")

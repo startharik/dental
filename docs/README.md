@@ -75,24 +75,30 @@ Dobbe is a modern web application that leverages artificial intelligence to anal
 - **Duplicate Handling**: Near-identical overlapping predictions of the same model class are suppressed from the clinical view, while raw predictions remain in diagnostics
 - **Model Diagnostics**: Confidence scores (model scores, not diagnostic probabilities) and raw bounding-box coordinates are hidden in a collapsible technical section
 - **Metadata Display**: DICOM metadata remains available separately from the converted inference image
-- **Clinical Report Workspace**: Actual model findings and supporting image markers, uncertainty and limitations, finding-linked assessment prompts, and an explicitly unconfirmed dentist impression draft
+- **Clinical Review Workspace**: Detection summary, FDI odontogram, finding crops, linked radiograph viewer, overlay toggle, and class-specific clinical assessment matrix
+- **Dentist Review Draft**: Findings can be confirmed, modified, assigned a dentist-identified FDI tooth, marked not applicable, and annotated with observations; review drafts save only in the current browser
+- **Research Mode**: Optional Groq or Gemini vision analysis returns structured, multi-finding research hypotheses, differential considerations, investigations, and broad care-pathway categories for dentist discussion
+- **Explicit External-Processing Consent**: Research Mode is opt-in per analysis; only the image, model detections, image dimensions/modality, and structured tooth/label annotations are sent to the configured provider, not DICOM metadata or free-text notes
 - **Export Capabilities**: Print or download clinical review reports as PDFs
 
 ### 🩺 Clinical Review Aid
 
-- **Finding-Specific Assessment Prompts**: Caries, periapical findings, periodontal findings, restorations, impaction, fractures, implants, and anatomy labels receive different review prompts tied to the submitted detection
-- **Clinical Limitations**: No inferred tooth numbers, confirmed diagnoses, severity ratings, treatment plans, prescriptions, or assistant task assignments
-- **Validation Status**: Prompts are not a validated clinical protocol; dentist review and clinical validation are required before clinical use
-- **No External Report Generation**: Review aids are generated locally from the supplied model detections; Groq is not used
+- **Finding-Specific Review Actions**: Supported labels, including restorations, root canal treatment, and impaction, receive refreshable clinician next steps tied to each submitted detection
+- **Research Hypotheses**: Optional multimodal analysis considers the source radiograph, displayed and raw detections, and structured dentist-entered labels/tooth assignments; model predictions remain separate from LLM interpretations
+- **Research Limitations**: AI hypotheses are not diagnoses or treatment instructions. Care pathways are restricted to broad evaluation categories; no prescriptions, procedural instructions, or inferred tooth numbers are generated
+- **Literature Scope**: No external dental literature database is connected; the model must not invent citations, and the report discloses that literature was not retrieved
+- **Validation Status**: Neither the configured prompts nor Groq research interpretations are validated clinical protocols; a dentist must independently review the image and patient context
+- **Review Persistence**: Dentist-entered review drafts use browser local storage only; there is no authentication or server-side clinical record
+- **External Processing**: The selected provider receives image pixels only after per-analysis user consent and confirmation that the image is authorized and de-identified/test data; DICOM metadata and free-text dentist notes are excluded, but text burned into image pixels cannot be automatically removed
 - **Dentist Confirmation Required**: The impression draft is not saved or identity-verified and is not a final clinical record
 
 ### 📄 PDF Export Features
 
 - **Professional Formatting**: Clean, medical-grade PDF layout with proper typography
-- **Clinical Review Content**: Includes detected findings, supporting numbered image markers, limitations, and finding-linked dentist assessment prompts
+- **Clinical Review Content**: Includes study information, summary, dentist-assigned FDI chart locations, annotated source-image copy, findings, assessment prompts, limitations, dentist-entered observations, review status, and final-impression draft
 - **Technical Information**: DICOM metadata, image specifications, and processing details
 - **Multi-page Support**: Automatic page breaks and pagination for lengthy reports
-- **Draft Status**: Clearly labels user-entered impression text as an unsaved, unconfirmed draft
+- **Draft Status**: Clearly labels browser-saved user-entered review as unauthenticated and not a final clinical record
 
 ## 🏗️ Architecture
 
@@ -208,10 +214,15 @@ Create `.env` files in both directories:
 
 ```env
 ROBOFLOW_API_KEY=your_roboflow_api_key_here
+RESEARCH_PROVIDER=groq
+GROQ_API_KEY=your_groq_api_key_here
+GROQ_RESEARCH_MODEL=qwen/qwen3.8-27b
+GOOGLE_API_KEY=your_rotated_google_api_key_here
+GOOGLE_RESEARCH_MODEL=gemini-flash-latest
 DEBUG=false
 ```
 
-The backend requires a Roboflow API key for image inference. For Docker Compose, put it in the repository-root `.env` file; for local backend development, put it in `backend/.env`. Clinical review aids are generated locally and do not require a Groq API key.
+The backend requires a Roboflow API key for image inference. Research Mode is optional and requires a key for the selected provider (`RESEARCH_PROVIDER=groq` or `RESEARCH_PROVIDER=gemini`); without it, deterministic review guidance remains available. For Docker Compose, put keys in the repository-root `.env` file; for local backend development, put them in `backend/.env`. Never commit API keys, and do not send identifiable patient images to an external model.
 
 **Frontend (`frontend/.env.local`)**:
 
@@ -323,7 +334,7 @@ Process DICOM files with metadata extraction or PNG images without DICOM metadat
 
 #### `POST /api/v1/generate-diagnostic-report`
 
-Generate a clinical review aid from detection results already returned by `/api/v1/detect-dicom`. The report is generated deterministically from the submitted detections; no external language model or patient metadata is sent to a report-generation service.
+Generate deterministic clinician review prompts from detection results already returned by `/api/v1/detect-dicom`. This endpoint does not use an external language model.
 
 **Request**: JSON with `predictions`, optional `metadata`, and optional `image_info`
 **Features**:
@@ -367,6 +378,61 @@ Generate a clinical review aid from detection results already returned by `/api/
 }
 ```
 
+#### `GET /api/v1/research-mode`
+
+Returns whether the optional Groq- or Gemini-powered Research Mode is configured and the selected model. It does not expose the API key.
+
+#### `POST /api/v1/research-analysis`
+
+Generate exploratory, structured research hypotheses from a de-identified/test image and its actual model outputs using the provider selected by `RESEARCH_PROVIDER`. The request must contain `share_consent: true`; the UI requires a per-analysis confirmation before sending.
+
+**External data**: The selected provider receives the image pixels, displayed and raw detections, image dimensions/modality, and structured dentist-entered labels/tooth assignments. DICOM metadata and free-text dentist notes are excluded. Burned-in identifiers in image pixels cannot be automatically removed.
+
+**Request**: JSON containing `predictions`, `raw_predictions`, `image_info`, optional `modality`, base64 `image_data_url` (PNG/JPEG), `dentist_annotations`, and `share_consent`.
+
+**Response**: `analysis` contains a separate LLM interpretation for each detection, differentials with supporting and missing evidence, investigations, broad care-pathway categories, follow-up, cross-finding patterns, and a combined interpretation. `model_predictions` preserves the original model detections separately. Model confidence values are copied from inference, not generated by the LLM.
+
+```json
+{
+  "analysis": {
+    "research_mode": "research",
+    "model": "qwen/qwen3.8-27b",
+    "generated_at": "2026-10-31T00:00:00",
+    "findings": [
+      {
+        "detection_id": "uuid-string",
+        "finding_name": "cavity",
+        "model_confidence": 0.839,
+        "anatomical_location": "Tooth not identified",
+        "possible_diagnosis": "Unconfirmed radiographic hypothesis",
+        "differential_diagnoses": [
+          {
+            "diagnosis": "Example differential",
+            "supporting_evidence": "Image evidence to verify",
+            "evidence_against_or_missing": "Clinical examination not provided"
+          }
+        ],
+        "ai_interpretation": "Exploratory interpretation requiring image and clinical review",
+        "clinical_significance": "Potential significance if confirmed",
+        "recommended_investigations": ["Clinical examination for dentist consideration"],
+        "potential_treatment_options": ["restorative assessment"],
+        "follow_up": "Determine based on confirmed findings and patient context",
+        "evidence_and_limitations": ["Model label is not a diagnosis"],
+        "related_detection_ids": [],
+        "dentist_annotation_comparison": "No dentist annotation provided"
+      }
+    ],
+    "combined_clinical_interpretation": "Unconfirmed research summary",
+    "cross_finding_patterns": [],
+    "source_scope": "No external dental literature was retrieved; no citations are provided.",
+    "limitations": "Exploratory AI-generated research hypotheses only."
+  },
+  "model_predictions": []
+}
+```
+
+Research output is not clinically validated, must not be used by itself for care decisions, and does not provide prescriptions or procedural instructions. No literature database is connected; the model is instructed not to invent citations.
+
 #### `GET /api/v1/health`
 
 Health check endpoint for monitoring.
@@ -378,6 +444,10 @@ Health check endpoint for monitoring.
 ```bash
 # Create the environment file and add your API keys
 echo "ROBOFLOW_API_KEY=your_api_key_here" > .env
+# Optional: enable consent-based Groq Research Mode
+echo "GROQ_API_KEY=your_groq_api_key_here" >> .env
+# Or select Gemini with a newly rotated key (do not reuse an exposed key)
+# Set RESEARCH_PROVIDER=gemini and GOOGLE_API_KEY=your_rotated_google_api_key_here in .env
 
 # Start production environment
 make quick-start

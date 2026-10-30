@@ -20,6 +20,7 @@ interface DetectionImagePreviewProps {
   detections?: Detection[];
   selectedDetectionId?: string;
   onDetectionSelect?: (detectionId: string) => void;
+  showOverlays?: boolean;
 }
 
 export function DetectionImagePreview({
@@ -30,8 +31,16 @@ export function DetectionImagePreview({
   detections = [],
   selectedDetectionId,
   onDetectionSelect,
+  showOverlays = true,
 }: DetectionImagePreviewProps) {
   const viewerRef = useRef<HTMLDivElement>(null);
+  const panStartRef = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    scrollLeft: number;
+    scrollTop: number;
+  } | null>(null);
   const [viewerSize, setViewerSize] = useState({ width: 0, height: 0 });
   const [zoom, setZoom] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -79,7 +88,7 @@ export function DetectionImagePreview({
           : "w-full"
       }
     >
-      <div className="mb-2 flex items-center justify-between gap-3">
+      <div className="clinical-report-no-print mb-2 flex items-center justify-between gap-3">
         <p className="truncate text-[11px] font-medium text-[#cbd5e1]">
           {width} × {height}px
           <span className="ml-2 text-[#8291a7]">· Model scores are not diagnostic probabilities</span>
@@ -120,9 +129,40 @@ export function DetectionImagePreview({
 
       <div
         ref={viewerRef}
-        className={`relative flex w-full items-center justify-center overflow-hidden rounded-lg bg-[#080d15] ${
+        className={`relative flex w-full items-center justify-center overflow-auto rounded-lg bg-[#080d15] ${
           isFullscreen ? "min-h-0 flex-1" : "h-[min(68vh,720px)] min-h-[360px]"
-        }`}
+        } ${zoom > 1 ? "cursor-grab active:cursor-grabbing" : ""}`}
+        onPointerDown={(event) => {
+          if (
+            zoom <= 1 ||
+            event.button !== 0 ||
+            (event.target instanceof Element && event.target.closest("button"))
+          ) {
+            return;
+          }
+          panStartRef.current = {
+            pointerId: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            scrollLeft: event.currentTarget.scrollLeft,
+            scrollTop: event.currentTarget.scrollTop,
+          };
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }}
+        onPointerMove={(event) => {
+          const pan = panStartRef.current;
+          if (!pan || pan.pointerId !== event.pointerId) return;
+          event.currentTarget.scrollLeft = pan.scrollLeft - (event.clientX - pan.x);
+          event.currentTarget.scrollTop = pan.scrollTop - (event.clientY - pan.y);
+        }}
+        onPointerUp={(event) => {
+          if (panStartRef.current?.pointerId !== event.pointerId) return;
+          panStartRef.current = null;
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }}
+        onPointerCancel={() => {
+          panStartRef.current = null;
+        }}
       >
         {fitScale > 0 && (
           <div
@@ -138,17 +178,19 @@ export function DetectionImagePreview({
               className="select-none object-fill"
               draggable={false}
             />
-            <div className="pointer-events-none absolute inset-0">
-              <DetectionOverlay
-                detections={detections}
-                originalWidth={width}
-                originalHeight={height}
-                displayWidth={displayWidth}
-                displayHeight={displayHeight}
-                selectedDetectionId={selectedDetectionId}
-                onDetectionSelect={onDetectionSelect}
-              />
-            </div>
+            {showOverlays && (
+              <div className="pointer-events-none absolute inset-0">
+                <DetectionOverlay
+                  detections={detections}
+                  originalWidth={width}
+                  originalHeight={height}
+                  displayWidth={displayWidth}
+                  displayHeight={displayHeight}
+                  selectedDetectionId={selectedDetectionId}
+                  onDetectionSelect={onDetectionSelect}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

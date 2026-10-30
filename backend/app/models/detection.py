@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from typing import List, Literal, Optional
 from datetime import datetime
+import re
 
 
 class Detection(BaseModel):
@@ -81,7 +82,7 @@ class ErrorResponse(BaseModel):
 class SuggestedClinicalAssessment(BaseModel):
     detection_id: str = Field(description="ID of the supporting model detection")
     suggestion: str = Field(
-        description="Non-diagnostic clinical assessment prompt for a dentist"
+        description="Non-diagnostic clinician next steps tied to a model detection"
     )
 
 
@@ -120,3 +121,136 @@ class DiagnosticReportRequest(BaseModel):
     image_info: Optional[ImageInfo] = Field(
         None, description="Image technical information"
     )
+
+
+class ResearchDentistAnnotation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    detection_id: str
+    review_status: Literal[
+        "awaiting_review", "confirmed", "modified", "not_applicable"
+    ]
+    dentist_label: Optional[str] = Field(default=None, max_length=100)
+    assigned_tooth: Optional[str] = Field(
+        default=None, pattern=r"^(1[1-8]|2[1-8]|3[1-8]|4[1-8])$"
+    )
+
+
+class ResearchAnalysisRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    predictions: List[Detection] = Field(
+        max_length=100,
+        description="Displayed inference findings with stable detection IDs"
+    )
+    raw_predictions: List[Detection] = Field(
+        default_factory=list,
+        max_length=200,
+        description="Unfiltered inference output for duplicate/overlap context",
+    )
+    image_info: ImageInfo
+    modality: Optional[str] = None
+    image_data_url: str = Field(max_length=20_000_000)
+    dentist_annotations: List[ResearchDentistAnnotation] = Field(
+        default_factory=list, max_length=100
+    )
+    share_consent: bool = Field(
+        description="Explicit confirmation to send a de-identified/test image to Groq"
+    )
+
+    @field_validator("image_data_url")
+    @classmethod
+    def validate_image_data_url(cls, value: str) -> str:
+        if not re.fullmatch(
+            r"data:image/(?:png|jpeg);base64,[A-Za-z0-9+/]+={0,2}", value
+        ):
+            raise ValueError("Only base64 PNG or JPEG image data is supported")
+        return value
+
+    @model_validator(mode="after")
+    def validate_share_consent(self) -> "ResearchAnalysisRequest":
+        if not self.share_consent:
+            raise ValueError("Explicit consent is required for external image analysis")
+        prediction_ids = {detection.detection_id for detection in self.predictions}
+        annotation_ids = [
+            annotation.detection_id for annotation in self.dentist_annotations
+        ]
+        if len(annotation_ids) != len(set(annotation_ids)) or not set(
+            annotation_ids
+        ).issubset(prediction_ids):
+            raise ValueError(
+                "Dentist annotations must uniquely reference supplied detections"
+            )
+        return self
+
+
+class ResearchModeStatus(BaseModel):
+    enabled: bool
+    provider: Literal["groq", "gemini"]
+    model: str
+
+
+class ResearchDifferential(BaseModel):
+    diagnosis: str
+    supporting_evidence: str
+    evidence_against_or_missing: str
+
+
+ResearchTreatmentCategory = Literal[
+    "monitoring or observation",
+    "restorative assessment",
+    "endodontic assessment",
+    "periodontal assessment",
+    "oral surgery assessment",
+    "prosthodontic assessment",
+    "further diagnostic work-up",
+    "no pathway inferable from available evidence",
+]
+
+
+class ResearchFindingNarrative(BaseModel):
+    detection_id: str
+    anatomical_location: str
+    possible_diagnosis: str
+    differential_diagnoses: List[ResearchDifferential]
+    ai_interpretation: str
+    clinical_significance: str
+    recommended_investigations: List[str]
+    potential_treatment_options: List[ResearchTreatmentCategory]
+    follow_up: str
+    evidence_and_limitations: List[str]
+    related_detection_ids: List[str]
+    dentist_annotation_comparison: str
+
+
+class ResearchNarrativePayload(BaseModel):
+    findings: List[ResearchFindingNarrative]
+    combined_clinical_interpretation: str
+    cross_finding_patterns: List[str]
+
+
+class ResearchFindingAnalysis(ResearchFindingNarrative):
+    finding_name: str
+    model_confidence: float
+
+
+class ResearchAnalysis(BaseModel):
+    research_mode: str = "research"
+    model: str
+    generated_at: datetime = Field(default_factory=datetime.now)
+    findings: List[ResearchFindingAnalysis]
+    combined_clinical_interpretation: str
+    cross_finding_patterns: List[str]
+    source_scope: str = (
+        "No external dental literature was retrieved; no citations are provided."
+    )
+    limitations: str = (
+        "Exploratory AI-generated research hypotheses only. Not a diagnosis, "
+        "treatment plan, or validated clinical protocol. Verify image findings "
+        "and all clinical conclusions with a qualified dentist and patient context."
+    )
+
+
+class ResearchAnalysisResponse(BaseModel):
+    analysis: ResearchAnalysis
+    model_predictions: List[Detection]

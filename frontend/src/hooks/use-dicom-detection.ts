@@ -8,6 +8,7 @@ import {
   FileDetectionState,
   DetectionProgress,
   DiagnosticReport,
+  ResearchAnalysis,
 } from "@/lib/types";
 
 interface DetectDicomFilesParams {
@@ -158,6 +159,20 @@ export function useDicomDetection() {
     []
   );
 
+  const updateResearchAnalysis = useCallback(
+    (fileId: string, analysis: ResearchAnalysis) => {
+      setDetectionProgress((prev) => ({
+        ...prev,
+        files: prev.files.map((file) =>
+          file.fileId === fileId
+            ? { ...file, researchAnalysis: analysis }
+            : file
+        ),
+      }));
+    },
+    []
+  );
+
   const reset = useCallback(() => {
     setDetectionProgress({
       files: [],
@@ -172,6 +187,7 @@ export function useDicomDetection() {
     ...mutation,
     detectionProgress,
     updateDiagnosticReport,
+    updateResearchAnalysis,
     reset,
   };
 }
