@@ -74,7 +74,8 @@ clean-all: ## Remove everything including images and build cache
 setup: ## Initial setup - copy env files and build
 	@if [ ! -f .env ]; then \
 		echo "ROBOFLOW_API_KEY=your_api_key_here" > .env; \
-		echo "OPENAI_API_KEY=your_openai_api_key_here" >> .env; \
+		echo "GROQ_API_KEY=your_groq_api_key_here" >> .env; \
+		echo "GROQ_MODEL=openai/gpt-oss-120b" >> .env; \
 		echo "Created .env file - please edit with your API keys"; \
 	fi
 	docker compose build

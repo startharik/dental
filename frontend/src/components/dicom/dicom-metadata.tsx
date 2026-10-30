@@ -8,71 +8,78 @@ interface DicomMetadataProps {
 }
 
 export function DicomMetadata({ metadata }: DicomMetadataProps) {
+  const rows = ([
+    ["Patient", metadata.patient_name],
+    ["Patient ID", metadata.patient_id],
+    ["Birth date", metadata.patient_birth_date],
+    ["Sex", metadata.patient_sex],
+    ["Modality", metadata.modality],
+    ["Study date", metadata.study_date],
+    ["Study time", metadata.study_time],
+    ["Study description", metadata.study_description],
+    ["Series description", metadata.series_description],
+    ["Acquisition date", metadata.acquisition_date],
+    ["Acquisition time", metadata.acquisition_time],
+    ["Manufacturer", metadata.manufacturer],
+    ["Equipment model", metadata.manufacturer_model_name],
+    ["Institution", metadata.institution_name],
+    ["Referring physician", metadata.referring_physician_name],
+    [
+      "Dimensions",
+      metadata.rows && metadata.columns
+        ? `${metadata.columns} × ${metadata.rows}`
+        : undefined,
+    ],
+    [
+      "Pixel spacing",
+      metadata.pixel_spacing?.length
+        ? metadata.pixel_spacing.join(" × ")
+        : undefined,
+    ],
+    [
+      "Pixel depth",
+      metadata.bits_stored
+        ? `${metadata.bits_stored} stored / ${metadata.bits_allocated ?? "?"} allocated bits`
+        : undefined,
+    ],
+    ["Photometric interpretation", metadata.photometric_interpretation],
+  ] satisfies [string, string | undefined][]).filter(
+    (row): row is [string, string] =>
+      typeof row[1] === "string" && row[1].length > 0
+  );
+
   return (
     <div>
       <h4 className="text-sm font-medium mb-2">DICOM Metadata</h4>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs sm:text-sm">
-        {metadata.patient_name && (
-          <>
-            <span className="text-muted-foreground font-medium">Patient:</span>
-            <span className="break-words">{metadata.patient_name}</span>
-          </>
-        )}
-        {metadata.patient_id && (
-          <>
-            <span className="text-muted-foreground font-medium">
-              Patient ID:
-            </span>
-            <div className="w-full flex items-center">
-              <span className="truncate flex-1">{metadata.patient_id}</span>
-              <Button
-                variant={"secondary"}
-                size="sm"
-                className="cursor-pointer focus-within:text-muted-foreground"
-                onClick={() => {
-                  if (metadata.patient_id) {
-                    navigator.clipboard.writeText(metadata.patient_id);
-                  }
-                }}
-              >
-                <CopyIcon size={8} className="size-3" />
-              </Button>
+      {rows.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs sm:text-sm">
+          {rows.map(([label, value]) => (
+            <div key={label} className="contents">
+              <span className="text-muted-foreground font-medium">
+                {label}:
+              </span>
+              <div className="flex min-w-0 items-center">
+                <span className="break-words">{value}</span>
+                {label === "Patient ID" && value && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    aria-label="Copy patient ID"
+                    className="ml-1 shrink-0 cursor-pointer focus-within:text-muted-foreground"
+                    onClick={() => navigator.clipboard.writeText(value)}
+                  >
+                    <CopyIcon size={8} className="size-3" />
+                  </Button>
+                )}
+              </div>
             </div>
-          </>
-        )}
-        {metadata.modality && (
-          <>
-            <span className="text-muted-foreground font-medium">Modality:</span>
-            <span>{metadata.modality}</span>
-          </>
-        )}
-        {metadata.study_date && (
-          <>
-            <span className="text-muted-foreground font-medium">
-              Study Date:
-            </span>
-            <span>{metadata.study_date}</span>
-          </>
-        )}
-        {metadata.manufacturer && (
-          <>
-            <span className="text-muted-foreground font-medium">
-              Manufacturer:
-            </span>
-            <span className="break-words">{metadata.manufacturer}</span>
-          </>
-        )}
-        {metadata.rows && metadata.columns && (
-          <>
-            <span className="text-muted-foreground font-medium">
-              Dimensions:
-            </span>
-            <span>
-              {metadata.columns}×{metadata.rows}
-            </span>
-          </>
-        )}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          No DICOM metadata is available for this image.
+        </p>
+      )}
     </div>
   );
 }

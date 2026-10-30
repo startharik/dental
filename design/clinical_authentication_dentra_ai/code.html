@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dentra AI - Intelligent Dental Imaging</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              navy: '#142B4A',
+              dark: '#0B192C',
+              teal: '#16A6A1',
+              'teal-light': '#E6F7F6',
+              border: '#E2E8F0',
+              canvas: '#F8FAFC',
+              muted: '#64748B'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      overscroll-behavior: none;
+      -webkit-font-smoothing: antialiased;
+    }
+    .pulse-glow {
+      box-shadow: 0 0 0 0 rgba(22, 166, 161, 0.45);
+      animation: ripple 2.5s infinite cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    @keyframes ripple {
+      0% {
+        box-shadow: 0 0 0 0 rgba(22, 166, 161, 0.5);
+      }
+      70% {
+        box-shadow: 0 0 0 14px rgba(22, 166, 161, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(22, 166, 161, 0);
+      }
+    }
+  </style>
+</head>
+<body class="bg-brand-canvas text-brand-dark font-sans min-h-screen flex flex-col justify-between selection:bg-brand-teal/20 selection:text-brand-navy">
+<!-- Minimal Top Navigation Bar -->
+<header class="w-full py-6 px-8 md:px-16 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-xl bg-brand-navy text-white flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-[20px] text-brand-teal">radiology</span>
+</div>
+<div>
+<span class="text-[17px] font-semibold tracking-tight text-brand-navy">Dentra<span class="text-brand-teal">AI</span></span>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden sm:flex items-center gap-1.5 text-xs text-brand-muted font-medium">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span>Workstation Connected</span>
+</div>
+<a class="text-xs text-brand-muted hover:text-brand-navy transition-colors" href="#help">Support</a>
+</div>
+</header>
+<!-- Main Center Experience -->
+<main class="w-full flex-1 flex items-center justify-center px-4 py-8 md:py-12">
+<div class="w-full max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 rounded-3xl bg-white border border-brand-border shadow-xl shadow-slate-200/50 overflow-hidden">
+<!-- Visual Display Column: Sleek Radiograph CADe Preview -->
+<div class="relative bg-gradient-to-br from-brand-dark via-brand-navy to-[#18365D] p-8 md:p-10 flex flex-col justify-between text-white overflow-hidden order-2 md:order-1">
+<!-- Ambient radial glow -->
+<div class="absolute -top-24 -left-24 w-72 h-72 bg-brand-teal/20 rounded-full blur-3xl pointer-events-none"></div>
+<div class="absolute -bottom-20 -right-20 w-64 h-64 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none"></div>
+<!-- Upper Tag -->
+<div class="relative z-10">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-[11px] font-medium tracking-wide text-brand-teal-light">
+<span class="w-1.5 h-1.5 rounded-full bg-brand-teal"></span>
+            CADe Segmentation Active
+          </div>
+<h2 class="mt-4 text-2xl font-medium tracking-tight text-white/95">Next-generation dental diagnostics.</h2>
+<p class="mt-1 text-xs text-slate-300 font-normal leading-relaxed">Precision diagnostic neural engine for effortless clinical clarity.</p>
+</div>
+<!-- Center Minimal Radiographic Visual Card -->
+<div class="relative my-8 z-10 w-full h-56 rounded-2xl bg-black/35 backdrop-blur-md border border-white/10 p-5 flex flex-col justify-between overflow-hidden shadow-inner">
+<div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+<span>BIT-WING · 70kVp</span>
+<span class="text-brand-teal flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">auto_awesome</span>
+              Lossless
+            </span>
+</div>
+<!-- Stylized Radiographic Teeth Form -->
+<div class="relative w-full h-28 flex items-center justify-center">
+<svg class="w-full h-full text-slate-400/40" fill="none" viewbox="0 0 280 90" xmlns="http://www.w3.org/2000/svg">
+<!-- Tooth Contours -->
+<path d="M45 80 C 48 35, 62 20, 78 20 C 94 20, 102 38, 105 80 Z" fill="currentColor" fill-opacity="0.35"></path>
+<path d="M108 80 C 114 28, 130 15, 148 15 C 166 15, 175 30, 180 80 Z" fill="currentColor" fill-opacity="0.5"></path>
+<path d="M184 80 C 192 24, 210 12, 230 12 C 250 12, 258 26, 264 80 Z" fill="currentColor" fill-opacity="0.4"></path>
+<!-- Subtle Bone Crest Curve -->
+<path d="M20 74 Q 80 68, 140 70 T 260 72" stroke="#64748B" stroke-dasharray="2 3" stroke-opacity="0.6" stroke-width="1.5"></path>
+<!-- Targeted AI Focal Bounding Ring -->
+<circle class="animate-spin" cx="140" cy="38" opacity="0.9" r="16" stroke="#16A6A1" stroke-dasharray="3 3" stroke-width="1.5" style="transform-origin: 140px 38px; animation-duration: 12s;"></circle>
+<circle cx="140" cy="38" fill="#16A6A1" r="4"></circle>
+</svg>
+<!-- Floating AI Detection Label -->
+<div class="absolute bottom-1 right-2 px-2.5 py-1 rounded-full bg-brand-navy/90 backdrop-blur-md border border-brand-teal/40 text-[10px] text-white flex items-center gap-1.5 shadow-lg">
+<span class="w-1.5 h-1.5 rounded-full bg-brand-teal pulse-glow"></span>
+<span class="font-medium">Caries Segment 96.4%</span>
+</div>
+</div>
+<div class="flex items-center justify-between text-[11px] text-slate-400">
+<span>Tooth #19–#21</span>
+<span class="text-slate-300">W: 4096 · L: 2048</span>
+</div>
+</div>
+<!-- Footnote / Tagline -->
+<div class="relative z-10 flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-white/10">
+<span>Enterprise PACS Integration</span>
+<span class="text-white/80 font-medium">HIPAA Certified</span>
+</div>
+</div>
+<!-- Login Column: Pristine Minimal Form -->
+<div class="p-8 md:p-12 flex flex-col justify-between bg-white order-1 md:order-2">
+<div>
+<!-- Header -->
+<div class="mb-8">
+<h1 class="text-2xl font-semibold tracking-tight text-brand-navy">Sign in</h1>
+<p class="text-sm text-brand-muted mt-1">Access your diagnostic workspace</p>
+</div>
+<!-- Enterprise SSO Quick Pills -->
+<div class="mb-6">
+<span class="text-[11px] font-medium text-slate-400 tracking-wider uppercase block mb-2.5">Single Sign-On</span>
+<div class="grid grid-cols-2 gap-2.5">
+<button class="group flex items-center justify-center gap-2 h-10 px-4 rounded-xl border border-brand-border hover:border-brand-teal/50 hover:bg-brand-canvas transition-all text-sm font-medium text-brand-navy" type="button">
+<span class="material-symbols-outlined text-[18px] text-brand-muted group-hover:text-brand-teal transition-colors">dns</span>
+<span>Epic EHR</span>
+</button>
+<button class="group flex items-center justify-center gap-2 h-10 px-4 rounded-xl border border-brand-border hover:border-brand-teal/50 hover:bg-brand-canvas transition-all text-sm font-medium text-brand-navy" type="button">
+<span class="material-symbols-outlined text-[18px] text-brand-muted group-hover:text-brand-teal transition-colors">domain</span>
+<span>Dexis / PMS</span>
+</button>
+</div>
+</div>
+<!-- Divider -->
+<div class="relative flex items-center justify-center my-6">
+<div class="w-full border-t border-brand-border"></div>
+<span class="absolute bg-white px-3 text-[11px] text-slate-400 font-medium">or continue with ID</span>
+</div>
+<!-- Form Inputs -->
+<form class="space-y-4" onsubmit="event.preventDefault(); handleAuthSubmit();">
+<div>
+<label class="block text-xs font-medium text-slate-700 mb-1.5" for="workstation-id">Workstation ID or Email</label>
+<div class="relative">
+<input class="w-full h-11 px-3.5 rounded-xl border border-brand-border bg-brand-canvas/60 text-sm text-brand-navy placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-brand-teal focus:ring-4 focus:ring-brand-teal/10 transition-all" id="workstation-id" placeholder="name@clinic.com or NPI" required="" type="text"/>
+</div>
+</div>
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<label class="text-xs font-medium text-slate-700" for="password">Password</label>
+<a class="text-xs text-brand-teal hover:underline font-medium" href="#reset">Forgot?</a>
+</div>
+<div class="relative">
+<input class="w-full h-11 px-3.5 pr-10 rounded-xl border border-brand-border bg-brand-canvas/60 text-sm text-brand-navy placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-brand-teal focus:ring-4 focus:ring-brand-teal/10 transition-all" id="password" placeholder="••••••••••••" required="" type="password"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1" onclick="togglePass()" type="button">
+<span class="material-symbols-outlined text-[18px]" id="eye-icon">visibility</span>
+</button>
+</div>
+</div>
+<!-- Submit Action -->
+<button class="w-full h-11 mt-2 rounded-xl bg-brand-navy hover:bg-[#0c1f38] text-white text-sm font-medium flex items-center justify-center gap-2 shadow-sm transition-all" id="submit-btn" type="submit">
+<span>Sign In</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</form>
+<!-- Biometric / Passkey 1-Click Option -->
+<div class="mt-4 pt-4 border-t border-brand-border flex items-center justify-between">
+<span class="text-xs text-slate-500">Fast sign-in</span>
+<button class="text-xs font-medium text-brand-navy hover:text-brand-teal inline-flex items-center gap-1.5 transition-colors" onclick="handleBiometric()" type="button">
+<span class="material-symbols-outlined text-[17px] text-brand-teal">contactless</span>
+<span>Passkey / FIDO2</span>
+</button>
+</div>
+</div>
+<!-- Subtle Feedback / Status -->
+<div class="hidden mt-4 text-center py-2 px-3 rounded-lg text-xs font-medium bg-brand-teal-light text-brand-teal" id="auth-status"></div>
+</div>
+</div>
+</main>
+<!-- Minimal Footer -->
+<footer class="w-full py-6 px-8 md:px-16 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-3">
+<span>© 2025 Dentra AI · Intelligent Dental Imaging</span>
+<div class="flex items-center gap-5">
+<a class="hover:text-brand-navy transition-colors" href="#privacy">Privacy</a>
+<a class="hover:text-brand-navy transition-colors" href="#security">Security</a>
+<a class="hover:text-brand-navy transition-colors" href="#terms">Terms</a>
+</div>
+</footer>
+<script>
+    function togglePass() {
+      const field = document.getElementById('password');
+      const icon = document.getElementById('eye-icon');
+      if (field.type === 'password') {
+        field.type = 'text';
+        icon.textContent = 'visibility_off';
+      } else {
+        field.type = 'password';
+        icon.textContent = 'visibility';
+      }
+    }
+
+    function handleAuthSubmit() {
+      const btn = document.getElementById('submit-btn');
+      const status = document.getElementById('auth-status');
+      btn.disabled = true;
+      btn.innerHTML = `<span class="material-symbols-outlined text-[16px] animate-spin">progress_activity</span><span>Signing In...</span>`;
+
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = `<span>Sign In</span><span class="material-symbols-outlined text-[16px]">arrow_forward</span>`;
+        status.textContent = 'Diagnostic console verified. Redirecting...';
+        status.classList.remove('hidden');
+      }, 900);
+    }
+
+    function handleBiometric() {
+      const status = document.getElementById('auth-status');
+      status.textContent = 'Awaiting biometric authorization...';
+      status.classList.remove('hidden');
+      setTimeout(() => {
+        status.textContent = 'Passkey confirmed. Launching workspace...';
+      }, 1200);
+    }
+  </script>
+</body></html>

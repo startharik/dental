@@ -4,7 +4,7 @@ from fastapi import HTTPException
 import logging
 import pydicom
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 import tempfile
 import os
 from typing import Dict, Any, Tuple
@@ -30,7 +30,7 @@ class InferenceService:
         self.settings = get_settings()
 
     async def detect_dental_conditions(
-        self, image_path: str, model_id: str = "adr/6"
+        self, image_path: str, model_id: str = "p_fase_1_v2/4"
     ) -> dict:
         """
         Run inference on dental image to detect cavities and periapical lesions
@@ -50,8 +50,19 @@ class InferenceService:
             result = client.infer(image_path, model_id=model_id)
             return result
         except Exception as e:
-            logger.error(f"Inference failed: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")
+            status_code = getattr(e, "status_code", None)
+            logger.error(
+                "Roboflow inference failed for model %s (HTTP %s)",
+                model_id,
+                status_code or "unknown",
+            )
+            detail = (
+                "Roboflow model was not found or is inaccessible. Check the model ID "
+                "and API key permissions."
+                if status_code == 404
+                else "Roboflow inference failed. Check the API key, model access, and backend logs."
+            )
+            raise HTTPException(status_code=502, detail=detail) from None
 
     def parse_dicom_metadata(self, dicom_file_path: str) -> DicomMetadata:
         """
@@ -228,16 +239,16 @@ class InferenceService:
             # Create PIL Image
             image = Image.fromarray(rgb_array.astype(np.uint8))
 
-            # Save as temporary JPEG file
-            temp_image_fd, temp_image_path = tempfile.mkstemp(suffix=".jpg")
+            # Save a lossless PNG for inference; DICOM metadata is returned separately.
+            temp_image_fd, temp_image_path = tempfile.mkstemp(suffix=".png")
             os.close(temp_image_fd)
 
-            image.save(temp_image_path, "JPEG", quality=95)
+            image.save(temp_image_path, "PNG")
 
             # Create type-safe image info
             image_info = ImageInfo(
                 original_shape=list(dicom_data.pixel_array.shape),
-                converted_format="JPEG",
+                converted_format="PNG",
                 converted_size=list(image.size),
                 original_dtype=str(dicom_data.pixel_array.dtype),
                 pixel_array_min=float(dicom_data.pixel_array.min()),
@@ -262,8 +273,68 @@ class InferenceService:
                 detail=f"Failed to convert DICOM file to image: {str(e)}",
             )
 
+    async def detect_dental_conditions_from_png(
+        self, png_file_path: str, model_id: str = "p_fase_1_v2/4"
+    ) -> Tuple[dict, DicomMetadata, ImageInfo]:
+        """Normalize a PNG to RGB and run inference without DICOM metadata."""
+        converted_image_path = None
+        try:
+            with Image.open(png_file_path) as source_image:
+                source_image.load()
+                source_image = ImageOps.exif_transpose(source_image)
+                source_pixels = np.asarray(source_image)
+
+                if source_pixels.ndim == 2 and source_pixels.dtype != np.uint8:
+                    pixel_min = float(source_pixels.min())
+                    pixel_max = float(source_pixels.max())
+                    if pixel_max > pixel_min:
+                        normalized_pixels = (
+                            (source_pixels.astype(np.float32) - pixel_min)
+                            / (pixel_max - pixel_min)
+                            * 255
+                        ).astype(np.uint8)
+                    else:
+                        normalized_pixels = np.full(
+                            source_pixels.shape, 128, dtype=np.uint8
+                        )
+                    image = Image.fromarray(normalized_pixels).convert("RGB")
+                else:
+                    image = source_image.convert("RGB")
+
+                temp_image_fd, converted_image_path = tempfile.mkstemp(suffix=".png")
+                os.close(temp_image_fd)
+                image.save(converted_image_path, "PNG")
+
+            image_info = ImageInfo(
+                original_shape=list(source_pixels.shape),
+                converted_format="PNG",
+                converted_size=list(image.size),
+                original_dtype=str(source_pixels.dtype),
+                pixel_array_min=float(source_pixels.min()),
+                pixel_array_max=float(source_pixels.max()),
+            )
+            inference_results = await self.detect_dental_conditions(
+                converted_image_path, model_id
+            )
+            return inference_results, DicomMetadata(), image_info
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to process PNG image: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=400, detail="Failed to read or process PNG image"
+            )
+        finally:
+            if converted_image_path and os.path.exists(converted_image_path):
+                try:
+                    os.unlink(converted_image_path)
+                except OSError as e:
+                    logger.warning(
+                        f"Failed to delete converted PNG file {converted_image_path}: {e}"
+                    )
+
     async def detect_dental_conditions_from_dicom(
-        self, dicom_file_path: str, model_id: str = "adr/6"
+        self, dicom_file_path: str, model_id: str = "p_fase_1_v2/4"
     ) -> Tuple[dict, DicomMetadata, ImageInfo]:
         """
         Process DICOM file: extract metadata, convert to image, and run inference

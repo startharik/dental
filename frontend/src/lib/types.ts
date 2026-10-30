@@ -84,12 +84,15 @@ export interface DetectionProgress {
   hasAnyErrors: boolean;
 }
 
+export interface SuggestedClinicalAssessment {
+  detection_id: string;
+  suggestion: string;
+}
+
 // Diagnostic Report Types
 export interface DiagnosticReport {
-  report: string;
-  summary: string;
-  recommendations: string[];
-  severity_level: "low" | "moderate" | "high";
+  uncertainty_and_limitations: string;
+  suggested_assessments: SuggestedClinicalAssessment[];
   generated_at: string;
 }
 

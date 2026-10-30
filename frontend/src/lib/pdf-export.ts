@@ -37,31 +37,29 @@ export const generateAnnotatedImage = async (
       ctx.drawImage(img, 0, 0, originalWidth, originalHeight);
 
       // Draw detection overlays
-      detections.forEach((detection) => {
+      detections.forEach((detection, index) => {
         const boxColor = getDetectionColor(detection.class_id);
+        const left = detection.x - detection.width / 2;
+        const top = detection.y - detection.height / 2;
 
         // Draw bounding box
         ctx.strokeStyle = boxColor;
         ctx.lineWidth = 3;
-        ctx.strokeRect(
-          detection.x,
-          detection.y,
-          detection.width,
-          detection.height
-        );
+        ctx.strokeRect(left, top, detection.width, detection.height);
 
         // Draw label background
-        const label = `${detection.class} (${(
-          detection.confidence * 100
-        ).toFixed(1)}%)`;
-        ctx.font = "14px Arial";
+        const label = String(index + 1).padStart(2, "0");
+        ctx.font = "bold 14px Arial";
         const labelMetrics = ctx.measureText(label);
         const labelWidth = labelMetrics.width + 8;
         const labelHeight = 20;
 
         // Position label above the box, but ensure it stays within image bounds
-        const labelX = detection.x;
-        const labelY = Math.max(labelHeight, detection.y - 2);
+        const labelX = Math.max(
+          0,
+          Math.min(left, originalWidth - labelWidth)
+        );
+        const labelY = Math.max(labelHeight, top - 2);
 
         // Draw label background
         ctx.fillStyle = boxColor;
@@ -92,6 +90,7 @@ export interface PDFExportData {
   imageInfo: ImageInfo;
   fileName: string;
   originalImageSrc?: string; // Add original image source for annotation
+  finalImpressionDraft?: string;
 }
 
 export const exportToPDF = async (data: PDFExportData): Promise<void> => {
@@ -216,75 +215,92 @@ export const exportToPDF = async (data: PDFExportData): Promise<void> => {
       }
     }
 
-    // Add severity and summary
+    // Add model limitations
     pdf.setFontSize(14);
     pdf.setFont("helvetica", "bold");
-    pdf.text("Diagnostic Summary", margin, yPosition);
+    pdf.text("Uncertainty and Limitations", margin, yPosition);
     yPosition += 8;
 
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
+    const limitationLines = pdf.splitTextToSize(
+      data.report.uncertainty_and_limitations,
+      contentWidth
+    );
 
-    // Severity
-    const severityText = `Severity Level: ${
-      data.report.severity_level.charAt(0).toUpperCase() +
-      data.report.severity_level.slice(1)
-    }`;
-    pdf.text(severityText, margin, yPosition);
-    yPosition += 8;
-
-    // Summary
-    const summaryLines = pdf.splitTextToSize(data.report.summary, contentWidth);
-    pdf.text(summaryLines, margin, yPosition);
-    yPosition += summaryLines.length * 5 + 5;
-
-    // Add detailed analysis
-    pdf.setFontSize(14);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Detailed Analysis", margin, yPosition);
-    yPosition += 8;
-
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
-    const reportLines = pdf.splitTextToSize(data.report.report, contentWidth);
-
-    // Check if we need a new page
-    if (yPosition + reportLines.length * 5 > pageHeight - margin) {
+    if (yPosition + limitationLines.length * 5 > pageHeight - margin) {
       pdf.addPage();
       yPosition = margin;
     }
 
-    pdf.text(reportLines, margin, yPosition);
-    yPosition += reportLines.length * 5 + 10;
+    pdf.text(limitationLines, margin, yPosition);
+    yPosition += limitationLines.length * 5 + 10;
 
-    // Add recommendations
     pdf.setFontSize(14);
     pdf.setFont("helvetica", "bold");
-
-    // Check if we need a new page for recommendations
     if (yPosition + 20 > pageHeight - margin) {
       pdf.addPage();
       yPosition = margin;
     }
 
-    pdf.text("Recommendations", margin, yPosition);
+    pdf.text("Suggested Clinical Assessments", margin, yPosition);
     yPosition += 8;
 
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
 
-    data.report.recommendations.forEach((recommendation) => {
-      // Check if we need a new page
-      if (yPosition + 10 > pageHeight - margin) {
+    data.report.suggested_assessments.forEach((assessment, index) => {
+      const findingIndex = data.detections.findIndex(
+        (detection) => detection.detection_id === assessment.detection_id
+      );
+      if (findingIndex < 0) return;
+
+      const assessmentLines = pdf.splitTextToSize(
+        `${index + 1}. Finding ${findingIndex + 1} (${data.detections[findingIndex].class}): ${assessment.suggestion}`,
+        contentWidth - 5
+      );
+      if (yPosition + assessmentLines.length * 5 > pageHeight - margin) {
+        pdf.addPage();
+        yPosition = margin;
+      }
+      pdf.text(assessmentLines, margin + 5, yPosition);
+      yPosition += assessmentLines.length * 5 + 2;
+    });
+
+    yPosition += 5;
+
+    if (data.finalImpressionDraft?.trim()) {
+      if (yPosition + 20 > pageHeight - margin) {
         pdf.addPage();
         yPosition = margin;
       }
 
-      const bulletPoint = `• ${recommendation}`;
-      const recLines = pdf.splitTextToSize(bulletPoint, contentWidth - 5);
-      pdf.text(recLines, margin + 5, yPosition);
-      yPosition += recLines.length * 5 + 2;
-    });
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Dentist's Review and Final Impression — Draft", margin, yPosition);
+      yPosition += 8;
+
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "italic");
+      pdf.text(
+        "Not saved, identity-verified, or confirmed as a final clinical record.",
+        margin,
+        yPosition
+      );
+      yPosition += 8;
+
+      pdf.setFont("helvetica", "normal");
+      const impressionLines = pdf.splitTextToSize(
+        data.finalImpressionDraft,
+        contentWidth
+      );
+      if (yPosition + impressionLines.length * 5 > pageHeight - margin) {
+        pdf.addPage();
+        yPosition = margin;
+      }
+      pdf.text(impressionLines, margin, yPosition);
+      yPosition += impressionLines.length * 5 + 5;
+    }
 
     yPosition += 5;
 
@@ -312,7 +328,7 @@ export const exportToPDF = async (data: PDFExportData): Promise<void> => {
         }
 
         pdf.text(
-          `${index + 1}. ${detection.class} (Confidence: ${(
+          `${index + 1}. ${detection.class} (Model score: ${(
             detection.confidence * 100
           ).toFixed(1)}%)`,
           margin,
@@ -320,7 +336,7 @@ export const exportToPDF = async (data: PDFExportData): Promise<void> => {
         );
         yPosition += 6;
 
-        const bboxText = `   Location: x=${detection.x}, y=${detection.y}, width=${detection.width}, height=${detection.height}`;
+        const bboxText = `   Model box center: x=${detection.x}, y=${detection.y}; size: ${detection.width} × ${detection.height}px`;
         pdf.text(bboxText, margin, yPosition);
         yPosition += 6;
 

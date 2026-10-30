@@ -78,14 +78,22 @@ class ErrorResponse(BaseModel):
     error_code: str = "VALIDATION_ERROR"
 
 
-class DiagnosticReport(BaseModel):
-    """Generated diagnostic report based on dental detections"""
+class SuggestedClinicalAssessment(BaseModel):
+    detection_id: str = Field(description="ID of the supporting model detection")
+    suggestion: str = Field(
+        description="Non-diagnostic clinical assessment prompt for a dentist"
+    )
 
-    report: str = Field(description="The generated diagnostic report text")
-    summary: str = Field(description="Brief summary of findings")
-    recommendations: List[str] = Field(description="List of treatment recommendations")
-    severity_level: str = Field(
-        description="Overall severity assessment (low, moderate, high)"
+
+class DiagnosticReport(BaseModel):
+    """Unconfirmed clinical review aid based on model detections."""
+
+    uncertainty_and_limitations: str = Field(
+        description="Limitations of the model predictions and this review aid"
+    )
+    suggested_assessments: List[SuggestedClinicalAssessment] = Field(
+        default_factory=list,
+        description="Clinical assessment suggestions linked to actual detection IDs",
     )
     generated_at: datetime = Field(default_factory=datetime.now)
 

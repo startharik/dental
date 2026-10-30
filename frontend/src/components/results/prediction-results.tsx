@@ -31,8 +31,8 @@ export function PredictionResults({
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <h3 className="text-base sm:text-lg font-semibold">
-          Prediction Results
+        <h3 className="text-base font-semibold tracking-tight text-[#142b4a] sm:text-lg">
+          Study findings
         </h3>
         <StatusBadges
           completedCount={completedFiles.length}

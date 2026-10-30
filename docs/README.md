@@ -55,34 +55,44 @@ Dobbe is a modern web application that leverages artificial intelligence to anal
 ### 📁 File Support
 
 - **DICOM Processing**: Full DICOM file support with metadata extraction
+- **PNG Image Support**: Upload PNG dental X-rays for AI detection; DICOM studies are converted to lossless PNG for model inference while original DICOM metadata is extracted and returned separately for display and reporting
+- **DICOM Metadata**: Preserve and display available patient, study, acquisition, equipment, and image details independently of the converted model image
 - **Drag & Drop Interface**: Intuitive file upload experience
-- **File Validation**: Comprehensive file type and size validation (max 10MB)
+- **File Validation**: DICOM and PNG type validation with a 10MB per-file limit
 - **Sample Files**: Test DICOM files available in `docs/sample/` folder for development and testing
+
+### 🏥 Clinical Workspace
+
+- **Two-Screen Workflow**: Separate New Analysis uploads from the Analysis Workspace; completing processing opens the workspace directly
+- **Responsive Navigation**: Full-height desktop sidebar and accessible slide-out navigation on smaller screens
+- **Per-Study Review**: Switch between completed and failed studies in the analysis workspace
+- **Responsive Radiology UI**: Clinical navy and teal styling keeps uploads, DICOM previews, and findings easy to review across screen sizes
 
 ### 📊 Comprehensive Results
 
-- **Visual Overlays**: Bounding boxes with detection confidence
-- **Metadata Display**: Complete DICOM metadata presentation
-- **Export Capabilities**: Download results and reports
-- **PDF Export**: Generate and download comprehensive diagnostic reports in PDF format
+- **Image Review**: Large radiograph viewer with zoom controls, fullscreen inspection, and numbered model regions
+- **Linked Findings**: Selecting a numbered finding highlights its box; selecting a box identifies the matching finding
+- **Duplicate Handling**: Near-identical overlapping predictions of the same model class are suppressed from the clinical view, while raw predictions remain in diagnostics
+- **Model Diagnostics**: Confidence scores (model scores, not diagnostic probabilities) and raw bounding-box coordinates are hidden in a collapsible technical section
+- **Metadata Display**: DICOM metadata remains available separately from the converted inference image
+- **Clinical Report Workspace**: Actual model findings and supporting image markers, uncertainty and limitations, finding-linked assessment prompts, and an explicitly unconfirmed dentist impression draft
+- **Export Capabilities**: Print or download clinical review reports as PDFs
 
-### 🤖 AI-Powered Diagnostic Reports
+### 🩺 Clinical Review Aid
 
-- **LangChain Integration**: Advanced natural language processing for medical reports
-- **Professional Medical Reports**: Structured diagnostic reports with clinical terminology
-- **Treatment Recommendations**: AI-generated treatment suggestions based on detections
-- **Severity Assessment**: Automated severity classification (low, moderate, high)
-- **OpenAI Integration**: Powered by GPT models for accurate medical analysis
-- **PDF Generation**: Export detailed diagnostic reports as downloadable PDF documents
+- **Finding-Specific Assessment Prompts**: Caries, periapical findings, periodontal findings, restorations, impaction, fractures, implants, and anatomy labels receive different review prompts tied to the submitted detection
+- **Clinical Limitations**: No inferred tooth numbers, confirmed diagnoses, severity ratings, treatment plans, prescriptions, or assistant task assignments
+- **Validation Status**: Prompts are not a validated clinical protocol; dentist review and clinical validation are required before clinical use
+- **No External Report Generation**: Review aids are generated locally from the supplied model detections; Groq is not used
+- **Dentist Confirmation Required**: The impression draft is not saved or identity-verified and is not a final clinical record
 
 ### 📄 PDF Export Features
 
 - **Professional Formatting**: Clean, medical-grade PDF layout with proper typography
-- **Comprehensive Content**: Includes patient information, diagnostic summary, detailed analysis, recommendations, and detection details
+- **Clinical Review Content**: Includes detected findings, supporting numbered image markers, limitations, and finding-linked dentist assessment prompts
 - **Technical Information**: DICOM metadata, image specifications, and processing details
 - **Multi-page Support**: Automatic page breaks and pagination for lengthy reports
-- **Structured Sections**: Organized sections including patient data, severity assessment, findings, and recommendations
-- **Download Ready**: Instant PDF generation with descriptive filenames
+- **Draft Status**: Clearly labels user-entered impression text as an unsaved, unconfirmed draft
 
 ## 🏗️ Architecture
 
@@ -143,7 +153,8 @@ graph TB
 ### External Services
 
 - **AI Models**: [Roboflow computer vision platform](https://app.roboflow.com/ "Roboflow computer vision platform")
-- **Model**: [Custom dental detection model (adr/6)](https://universe.roboflow.com/new-workspace-oorwh/adr/model/6 "Custom dental detection model (adr/6)")
+- **Model**: `p_fase_1_v2/4`
+- **Model classes**: Determined by the selected Roboflow model
 
 ## 📋 Prerequisites
 
@@ -198,8 +209,9 @@ Create `.env` files in both directories:
 ```env
 ROBOFLOW_API_KEY=your_roboflow_api_key_here
 DEBUG=false
-OPENAI_API_KEY=your_openai_api_key_here
 ```
+
+The backend requires a Roboflow API key for image inference. For Docker Compose, put it in the repository-root `.env` file; for local backend development, put it in `backend/.env`. Clinical review aids are generated locally and do not require a Groq API key.
 
 **Frontend (`frontend/.env.local`)**:
 
@@ -277,9 +289,9 @@ Detect dental conditions in standard image files.
 
 #### `POST /api/v1/detect-dicom`
 
-Process DICOM files with metadata extraction and condition detection.
+Process DICOM files with metadata extraction or PNG images without DICOM metadata.
 
-**Request**: Multipart form with DICOM file
+**Request**: Multipart form with a DICOM (`.dcm`, `.dicom`), DICOM-compatible RVG (`.rvg`), or PNG (`.png`) file. Proprietary RVG formats that are not DICOM-compatible are not supported.
 **Response**: Complete analysis with the following format:
 
 ```json
@@ -299,11 +311,11 @@ Process DICOM files with metadata extraction and condition detection.
   "metadata": {
     "patient_id": "12345",
     "study_date": "20241208"
-    // ... additional DICOM metadata
+    // ... additional DICOM metadata; empty for PNG images
   },
   "image_info": {
     "original_shape": [512, 512],
-    "converted_format": "JPEG",
+    "converted_format": "PNG",
     "converted_size": [512, 512]
   }
 }
@@ -311,29 +323,28 @@ Process DICOM files with metadata extraction and condition detection.
 
 #### `POST /api/v1/generate-diagnostic-report`
 
-Generate comprehensive AI-powered diagnostic reports from dental image analysis using LangChain and OpenAI.
+Generate a clinical review aid from detection results already returned by `/api/v1/detect-dicom`. The report is generated deterministically from the submitted detections; no external language model or patient metadata is sent to a report-generation service.
 
-**Request**: Multipart form with image file (DICOM or standard format)
+**Request**: JSON with `predictions`, optional `metadata`, and optional `image_info`
 **Features**:
 
-- Processes both DICOM and standard image formats
-- Runs AI detection analysis
-- Generates professional medical reports using LangChain
-- Provides treatment recommendations and severity assessment
+- Does not rerun inference; uses the submitted detections from the completed analysis
+- Produces uncertainty notes and one class-specific assessment prompt for each supplied detection ID
+- Tailors review points to the detected label, including explicit handling of implant brands, anatomy labels, and unconfigured classes
+- Does not infer tooth numbers, confirm diagnoses, prescribe treatment, or assign assistant tasks
 
-**Response**: Complete diagnostic analysis with the following format:
+**Response**: Clinical review aid in the following format:
 
 ```json
 {
   "diagnostic_report": {
-    "report": "Detailed professional diagnostic report text with medical terminology",
-    "summary": "Brief summary of key findings and conditions detected",
-    "recommendations": [
-      "Schedule follow-up appointment with endodontist",
-      "Consider root canal therapy for affected tooth",
-      "Monitor adjacent teeth for signs of decay progression"
+    "uncertainty_and_limitations": "These class-specific prompts are for clinician review, not diagnoses or treatment recommendations, and have not been independently validated as a clinical protocol. Model scores are not calibrated diagnostic probabilities. A dentist must review the source radiograph and clinical context before documenting a conclusion.",
+    "suggested_assessments": [
+      {
+        "detection_id": "uuid-string",
+        "suggestion": "Finding 01 (cavity): Inspect the marked surface for a radiolucency and its apparent relationship to enamel, dentin, and the pulp; check for proximal overlap, cervical burnout, and restoration-related artifacts. Correlate with a clinical visual examination, symptoms, and caries risk. The image and model label alone cannot establish lesion activity, cavitation, or treatment need."
+      }
     ],
-    "severity_level": "moderate",
     "generated_at": "2024-12-08T10:30:00Z"
   },
   "detections_used": [
@@ -365,7 +376,7 @@ Health check endpoint for monitoring.
 ### Quick Start
 
 ```bash
-# Copy environment file and add your Roboflow API key
+# Create the environment file and add your API keys
 echo "ROBOFLOW_API_KEY=your_api_key_here" > .env
 
 # Start production environment
@@ -379,7 +390,7 @@ docker compose build && docker compose up -d
 ### Development with Docker
 
 ```bash
-# Copy environment file and add your Roboflow API key
+# Create the environment file and add your API keys
 echo "ROBOFLOW_API_KEY=your_api_key_here" > .env
 
 # Start development with hot reload and file watching
@@ -472,9 +483,9 @@ dobbe/
 | Variable              | Description                           | Required | Default                        |
 | --------------------- | ------------------------------------- | -------- | ------------------------------ |
 | `ROBOFLOW_API_KEY`    | API key for Roboflow inference        | Yes      | -                              |
-| `OPENAI_API_KEY`      | OpenAI API key for diagnostic reports | Yes      | -                              |
 | `DEBUG`               | Enable debug mode                     | No       | `false`                        |
 | `NEXT_PUBLIC_API_URL` | Backend API URL                       | No       | `http://localhost:8000/api/v1` |
+| `FRONTEND_PORT`       | Host port for the frontend            | No       | `3000`                         |
 
 ## 🔧 Development
 

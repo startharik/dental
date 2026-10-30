@@ -107,7 +107,7 @@ async def detect_dental_conditions(
     responses={
         400: {
             "model": ErrorResponse,
-            "description": "Invalid DICOM file or parsing error",
+            "description": "Invalid DICOM or PNG file",
         },
         413: {"model": ErrorResponse, "description": "File too large"},
         500: {"model": ErrorResponse, "description": "Processing failed"},
@@ -119,31 +119,33 @@ async def detect_dental_conditions_dicom(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> DicomDetectionResponse:
     """
-    Detect cavities and periapical lesions in uploaded DICOM file
+    Detect cavities and periapical lesions in an uploaded DICOM or PNG image
 
-    This endpoint processes DICOM files by:
-    1. Extracting DICOM metadata (patient info, study details, etc.)
-    2. Converting the DICOM image to a standard format
+    This endpoint processes DICOM and PNG files by:
+    1. Extracting DICOM metadata when present
+    2. Normalizing the image to a model-compatible format
     3. Running AI inference to detect dental conditions
     4. Returning all information together
 
     The response includes:
     - Detection predictions with bounding boxes and confidence scores
-    - Complete DICOM metadata
+    - DICOM metadata when present
     - Image conversion information
     """
 
-    # Validate file type - DICOM files can have various content types
-    allowed_extensions = [".dcm", ".dicom", ".DCM", ".DICOM"]
+    # DICOM files can have various content types; PNG uploads may use a generic MIME type.
+    allowed_extensions = {".dcm", ".dicom", ".rvg"}
     file_extension = os.path.splitext(file.filename or "")[1] if file.filename else ""
+    is_png = file.content_type == "image/png" or file_extension.lower() == ".png"
+    is_dicom = (
+        file.content_type in settings.allowed_dicom_file_types
+        or file_extension.lower() in allowed_extensions
+    )
 
-    if (
-        file.content_type not in settings.allowed_dicom_file_types
-        and file_extension not in allowed_extensions
-    ):
+    if not is_png and not is_dicom:
         raise HTTPException(
             status_code=400,
-            detail=f"File must be a DICOM file (.dcm, .dicom) or have content type: {', '.join(settings.allowed_dicom_file_types)}",
+            detail="File must be a DICOM/RVG file (.dcm, .dicom, .rvg) or a PNG image (.png)",
         )
 
     # Validate file size
@@ -156,19 +158,26 @@ async def detect_dental_conditions_dicom(
             detail=f"File size ({file_size} bytes) exceeds maximum allowed size ({settings.max_file_size} bytes)",
         )
 
-    # Save uploaded DICOM file temporarily
+    # Save uploaded study file temporarily
     temp_file_path = None
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".dcm") as temp_file:
+        suffix = ".png" if is_png else ".dcm"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
             temp_file.write(content)
             temp_file_path = temp_file.name
 
-        # Process DICOM file: extract metadata, convert to image, and run inference
-        inference_results, metadata, image_info = (
-            await inference_service.detect_dental_conditions_from_dicom(
-                temp_file_path, settings.default_model_id
+        if is_png:
+            inference_results, metadata, image_info = (
+                await inference_service.detect_dental_conditions_from_png(
+                    temp_file_path, settings.default_model_id
+                )
             )
-        )
+        else:
+            inference_results, metadata, image_info = (
+                await inference_service.detect_dental_conditions_from_dicom(
+                    temp_file_path, settings.default_model_id
+                )
+            )
 
         return DicomDetectionResponse(
             predictions=inference_results.get("predictions", []),
@@ -181,11 +190,11 @@ async def detect_dental_conditions_dicom(
         raise
     except Exception as e:
         logger.error(
-            f"Unexpected error in DICOM detection endpoint: {str(e)}", exc_info=True
+            f"Unexpected error in study detection endpoint: {str(e)}", exc_info=True
         )
         raise HTTPException(
             status_code=500,
-            detail="An unexpected error occurred during DICOM processing",
+            detail="An unexpected error occurred during study processing",
         )
     finally:
         # Clean up temporary file
@@ -209,31 +218,20 @@ async def generate_diagnostic_report_from_detections(
     diagnostic_service: Annotated[
         DiagnosticReportService, Depends(get_diagnostic_report_service)
     ],
-    settings: Annotated[Settings, Depends(get_settings)],
 ) -> DiagnosticReportResponse:
     """
-    Generate a comprehensive diagnostic report from detection results
+    Generate a clinical review aid from actual inference results.
 
-    This endpoint accepts detection results from previous analysis and generates
-    a professional diagnostic report using LangChain and OpenAI.
-
-    The generated report includes:
-    - Detailed analysis of detected conditions
-    - Professional medical terminology
-    - Treatment recommendations
-    - Severity assessment
-    - Summary of key findings
+    The generated assessment prompts are tied to the supplied detection IDs;
+    no LLM-generated diagnosis or treatment advice is returned.
 
     This endpoint is designed to be called after /detect-dicom
     to generate reports from existing detection results.
     """
 
     try:
-        # Generate diagnostic report using LangChain
         diagnostic_report = await diagnostic_service.generate_diagnostic_report(
-            detections=request.predictions,
-            metadata=request.metadata,
-            image_info=request.image_info,
+            detections=request.predictions
         )
 
         return DiagnosticReportResponse(
@@ -248,7 +246,7 @@ async def generate_diagnostic_report_from_detections(
         )
         raise HTTPException(
             status_code=500,
-            detail="An unexpected error occurred during diagnostic report generation",
+            detail="Clinical review aid generation failed. Check the backend logs.",
         )
 
 
