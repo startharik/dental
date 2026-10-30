@@ -91,7 +91,7 @@ export function PredictionResults({
           axios.isAxiosError<{ detail?: string }>(error) &&
           typeof error.response?.data.detail === "string"
             ? error.response.data.detail
-            : `${researchModeStatus.data?.provider === "groq" ? "Groq" : "Gemini"} analysis failed. You can retry.`;
+            : "LePro AI analysis failed. You can retry.";
         setResearchRuns((current) => ({
           ...current,
           [fileId]: { status: "error", error: message },
@@ -106,7 +106,6 @@ export function PredictionResults({
       files,
       generateResearchAnalysis,
       onResearchAnalysisGenerated,
-      researchModeStatus.data?.provider,
     ]
   );
 

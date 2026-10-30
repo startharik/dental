@@ -34,9 +34,11 @@ class DiagnosticReportServiceTests(unittest.TestCase):
             assessment.suggestion
             for assessment in report.suggested_assessments
         ]
-        self.assertIn("eruption status", actions[0])
-        self.assertIn("restoration", actions[1])
-        self.assertIn("canal filling", actions[2])
+        self.assertIn("tooth with the dentist", actions[0])
+        self.assertIn("restoration history", actions[1])
+        self.assertIn("prior root-canal notes", actions[2])
+        self.assertIn("pull earlier X-rays", actions[2])
+        self.assertIn("ask the dentist", actions[2])
         self.assertTrue(all(len(action) < 150 for action in actions))
         self.assertTrue(
             all(

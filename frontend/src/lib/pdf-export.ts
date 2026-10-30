@@ -325,7 +325,7 @@ export const exportToPDF = async (data: PDFExportData): Promise<void> => {
     if (researchAnalysis) {
       addHeading("AI Research Mode · exploratory and unverified");
       addText(
-        `Model: ${researchAnalysis.model} · Generated: ${new Date(researchAnalysis.generated_at).toLocaleString()}`
+        `LePro AI · Generated: ${new Date(researchAnalysis.generated_at).toLocaleString()}`
       );
       addText(
         `Combined interpretation: ${researchAnalysis.combined_clinical_interpretation}`,
@@ -383,7 +383,7 @@ export const exportToPDF = async (data: PDFExportData): Promise<void> => {
       );
     }
 
-    addHeading("7. Recommended clinician next steps");
+    addHeading("7. Assistant preparation");
     const assessments = data.report?.suggested_assessments ?? [];
     const validAssessments = assessments.filter((assessment) =>
       data.detections.some(

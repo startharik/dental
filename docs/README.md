@@ -77,8 +77,9 @@ Dobbe is a modern web application that leverages artificial intelligence to anal
 - **Metadata Display**: DICOM metadata remains available separately from the converted inference image
 - **Clinical Review Workspace**: Detection summary, FDI odontogram, finding crops, linked radiograph viewer, overlay toggle, and class-specific clinical assessment matrix
 - **Dentist Review Draft**: Findings can be confirmed, modified, assigned a dentist-identified FDI tooth, marked not applicable, and annotated with observations; review drafts save only in the current browser
-- **Research Mode**: Optional Groq or Gemini vision analysis returns structured, multi-finding research hypotheses, differential considerations, investigations, and broad care-pathway categories for dentist discussion
-- **Compact Research Findings**: Research results use short visual summaries, image crops, model-score and review-status badges; differential hypotheses and supporting details are available on demand
+- **Assistant Preparation**: Short, class-specific tasks help staff gather relevant history and prior images for the dentist's review
+- **Research Mode**: LePro AI is the branded research experience, backed by the configured Groq or Gemini vision provider; it returns structured, multi-finding hypotheses, differentials, investigations, and care-pathway categories for dentist discussion
+- **Compact Research Findings**: Research results prioritize assistant preparation, image crops, model-score and review-status badges; AI interpretation and clinical detail are available on demand
 - **Explicit External-Processing Consent**: Research Mode uses an opt-in preference saved in this browser; changing providers requires a fresh opt-in. When enabled, completed images are automatically sent with model detections, image dimensions/modality, and structured tooth/label annotations to the configured provider, not DICOM metadata or free-text notes
 - **Export Capabilities**: Print or download clinical review reports as PDFs
 

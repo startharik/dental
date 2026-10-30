@@ -855,7 +855,7 @@ export function DiagnosticReportComponent({
             </div>
             {researchAnalysis && (
               <span className="text-[9px] text-[#718198]">
-                {researchAnalysis.model} ·{" "}
+                LePro AI ·{" "}
                 {new Date(researchAnalysis.generated_at).toLocaleString()}
               </span>
             )}
@@ -876,14 +876,7 @@ export function DiagnosticReportComponent({
             {researchModeStatus.data &&
               !researchModeStatus.data.enabled && (
                 <p className="text-[10px] text-[#718198]">
-                  {researchModeStatus.data.provider === "gemini"
-                    ? "Gemini is"
-                    : "Groq is"}{" "}
-                  not configured. Set{" "}
-                  {researchModeStatus.data.provider === "gemini"
-                    ? "GOOGLE_API_KEY"
-                    : "GROQ_API_KEY"}{" "}
-                  in the backend environment to enable this optional feature.
+                  LePro AI analysis is not available for this instance.
                 </p>
               )}
             {!originalImageSrc && (
@@ -899,10 +892,7 @@ export function DiagnosticReportComponent({
                 className="flex items-center gap-2 text-[10px] text-[#61758b]"
               >
                 <RefreshCw className="size-3.5 animate-spin" />
-                {researchModeStatus.data?.provider === "groq"
-                  ? "Groq"
-                  : "Gemini"}{" "}
-                is analyzing this radiograph and its findings...
+                LePro AI is analyzing this radiograph and its findings...
               </p>
             )}
             {!researchAnalysis && researchAnalysisStatus === "idle" && (
@@ -933,33 +923,33 @@ export function DiagnosticReportComponent({
 
             {researchAnalysis && (
               <div className="space-y-3 border-t border-[#e7eef4] pt-4">
-                <div className="rounded-lg border border-[#d9e7ee] bg-[#f7fbfd] p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="text-xs font-bold text-[#142b4a]">
-                      Overall interpretation
-                    </h4>
+                <details className="group rounded-lg border border-[#d9e7ee] bg-white">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-[10px] font-semibold text-[#344861] [&::-webkit-details-marker]:hidden">
+                    <span>Image-level AI summary</span>
                     <span className="rounded-full bg-[#e7f5f4] px-2 py-0.5 text-[9px] font-semibold text-[#176b76]">
-                      AI hypothesis
+                      Research
                     </span>
+                  </summary>
+                  <div className="border-t border-[#e7eef4] bg-[#f7fbfd] p-3">
+                    <p className="whitespace-pre-line text-[10px] leading-5 text-[#465b72]">
+                      {researchAnalysis.combined_clinical_interpretation}
+                    </p>
+                    {researchAnalysis.cross_finding_patterns.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {researchAnalysis.cross_finding_patterns.map(
+                          (pattern, patternIndex) => (
+                            <span
+                              key={`pattern-${patternIndex}`}
+                              className="max-w-full rounded-full border border-[#d9e7ee] bg-white px-2.5 py-1 text-[9px] leading-4 text-[#53677e]"
+                            >
+                              {pattern}
+                            </span>
+                          )
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <p className="mt-1 line-clamp-3 whitespace-pre-line text-[10px] leading-5 text-[#465b72]">
-                    {researchAnalysis.combined_clinical_interpretation}
-                  </p>
-                  {researchAnalysis.cross_finding_patterns.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {researchAnalysis.cross_finding_patterns.map(
-                        (pattern, patternIndex) => (
-                          <span
-                            key={`pattern-${patternIndex}`}
-                            className="max-w-full rounded-full border border-[#d9e7ee] bg-white px-2.5 py-1 text-[9px] leading-4 text-[#53677e]"
-                          >
-                            {pattern}
-                          </span>
-                        )
-                      )}
-                    </div>
-                  )}
-                </div>
+                </details>
                 <div className="space-y-2">
                   {researchAnalysis.findings.map((finding, index) => {
                     const detection = predictions.find(
@@ -974,7 +964,11 @@ export function DiagnosticReportComponent({
                         key={finding.detection_id}
                         finding={finding}
                         detection={detection}
-                        index={index}
+                          assistantAction={
+                            assessmentByDetection.get(detection.detection_id)
+                              ?.suggestion
+                          }
+                          index={index}
                         imageSrc={originalImageSrc}
                         imageWidth={
                           imageInfo.converted_size[0] ??
@@ -1010,10 +1004,10 @@ export function DiagnosticReportComponent({
                 id="assessment-matrix-heading"
                 className="text-sm font-bold text-[#142b4a]"
               >
-                Clinical assessment matrix
+                Assistant prep
               </h3>
               <p className="mt-1 text-[10px] text-[#78889c]">
-                Recommended next steps for reviewing each model finding.
+                Quick tasks to prepare for dentist review.
               </p>
             </div>
             <Button
@@ -1028,7 +1022,7 @@ export function DiagnosticReportComponent({
               ) : (
                 <Sparkles className="size-3.5" />
               )}
-              {report ? "Refresh guidance" : "Generate guidance"}
+              {report ? "Refresh steps" : "Prepare handoff"}
             </Button>
           </div>
           {generateReport.isError && !report && (
@@ -1048,11 +1042,11 @@ export function DiagnosticReportComponent({
               <thead className="bg-[#f5f7fa] text-[10px] uppercase tracking-wide text-[#607187]">
                 <tr>
                   <th className="w-[18%] px-4 py-3 font-semibold">Finding</th>
-                  <th className="w-[24%] px-4 py-3 font-semibold">
-                    Supporting evidence
+                  <th className="w-[18%] px-4 py-3 font-semibold">
+                    Image
                   </th>
-                  <th className="w-[40%] px-4 py-3 font-semibold">
-                    Recommended dentist action
+                  <th className="w-[46%] px-4 py-3 font-semibold">
+                    Assistant preparation
                   </th>
                   <th className="w-[18%] px-4 py-3 font-semibold">
                     Dentist review
@@ -1104,11 +1098,17 @@ export function DiagnosticReportComponent({
                         </button>
                       </td>
                       <td className="px-4 py-3 align-top text-[10px] leading-4 text-[#53677e]">
-                        Center {detection.x.toFixed(1)}, {detection.y.toFixed(1)}
-                        px · {detection.width} × {detection.height}px
-                        <span className="mt-1 block">
-                          Model score {(detection.confidence * 100).toFixed(1)}%
-                        </span>
+                        <button
+                          type="button"
+                          className="font-semibold text-[#13817e] hover:underline"
+                          onClick={() => {
+                            setSelectedDetectionId(detection.detection_id);
+                            setSelectedToothNumber(findingReview.toothNumber);
+                            onLocateFinding(detection.detection_id);
+                          }}
+                        >
+                          View marked area
+                        </button>
                       </td>
                       <td className="px-4 py-3 align-top text-[10px] leading-5 text-[#53677e]">
                         {assessment ? (
@@ -1120,23 +1120,9 @@ export function DiagnosticReportComponent({
                           </p>
                         ) : (
                           <span className="text-[#8291a7]">
-                            No recommended action is available for this finding.
+                            Have the image and relevant chart history ready for
+                            dentist review.
                           </span>
-                        )}
-                        {assessment && (
-                          <button
-                            type="button"
-                            className="clinical-report-no-print mt-1 flex items-center gap-1 font-semibold text-[#13817e] hover:underline"
-                            onClick={() => {
-                              setSelectedDetectionId(detection.detection_id);
-                              setSelectedToothNumber(
-                                findingReview.toothNumber
-                              );
-                            }}
-                          >
-                            <LocateFixed className="size-3" />
-                            Locate evidence
-                          </button>
                         )}
                       </td>
                       <td className="px-4 py-3 align-top">
@@ -1466,6 +1452,7 @@ export function DiagnosticReportComponent({
 function ResearchFindingCard({
   finding,
   detection,
+  assistantAction,
   index,
   imageSrc,
   imageWidth,
@@ -1475,6 +1462,7 @@ function ResearchFindingCard({
 }: {
   finding: ResearchAnalysis["findings"][number];
   detection: Detection;
+  assistantAction?: string;
   index: number;
   imageSrc?: string;
   imageWidth: number;
@@ -1534,6 +1522,25 @@ function ResearchFindingCard({
           </button>
         </div>
         <div className="min-w-0 space-y-3 text-[10px] leading-4 text-[#53677e]">
+          <div className="rounded-lg border border-[#bfe5df] bg-[#effaf8] p-3">
+            <h5 className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wide text-[#176b76]">
+              <CheckCircle2 className="size-3.5" />
+              Assistant preparation
+            </h5>
+            <p className="mt-1 text-[11px] leading-5 text-[#344861]">
+              {assistantAction ??
+                "Have the marked radiograph and relevant chart history ready for dentist review."}
+            </p>
+          </div>
+          <details className="group/details rounded-lg border border-[#e5ebf1] bg-white">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-[10px] font-semibold text-[#344861] [&::-webkit-details-marker]:hidden">
+              <span>Clinical context</span>
+              <span className="text-[9px] font-medium text-[#13817e]">
+                <span className="group-open/details:hidden">Expand</span>
+                <span className="hidden group-open/details:inline">Collapse</span>
+              </span>
+            </summary>
+            <div className="space-y-3 border-t border-[#edf1f5] p-3">
           <div className="grid gap-2 sm:grid-cols-2">
             <ResearchSummaryItem
               label="Location"
@@ -1545,19 +1552,10 @@ function ResearchFindingCard({
             />
           </div>
           <ResearchSummaryItem
-            label="Interpretation"
+            label="AI interpretation"
             value={finding.ai_interpretation}
             clamp
           />
-          <details className="group/details rounded-lg border border-[#e5ebf1] bg-white">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-[10px] font-semibold text-[#344861] [&::-webkit-details-marker]:hidden">
-              <span>More clinical details</span>
-              <span className="text-[9px] font-medium text-[#13817e]">
-                <span className="group-open/details:hidden">Expand</span>
-                <span className="hidden group-open/details:inline">Collapse</span>
-              </span>
-            </summary>
-            <div className="space-y-3 border-t border-[#edf1f5] p-3">
           {finding.differential_diagnoses.length > 0 && (
             <div>
               <h5 className="font-semibold text-[#344861]">Differentials</h5>

@@ -317,7 +317,7 @@ class ResearchAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(exception_context.exception.status_code, 429)
         self.assertEqual(
             exception_context.exception.detail,
-            "Groq is temporarily rate-limited. Wait before retrying; no analysis was saved.",
+            "LePro AI is temporarily busy. Wait before retrying; no analysis was saved.",
         )
 
     def test_request_requires_explicit_consent(self) -> None:

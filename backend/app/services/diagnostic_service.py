@@ -5,27 +5,27 @@ from ..models.detection import Detection, DiagnosticReport, SuggestedClinicalAss
 
 
 _CLASS_ASSESSMENT_GUIDANCE = {
-    "abscess": "Assess the periapical area; correlate with pulp tests, percussion, palpation and symptoms.",
-    "attrition": "Inspect wear facets and remaining tooth structure; correlate with occlusion, sensitivity and parafunction history.",
-    "bone loss": "Assess crestal level and bone-loss pattern; correlate with probing depths, attachment levels and furcation findings.",
-    "calculus": "Inspect interproximal roots for radiopaque deposits; correlate with periodontal probing and bleeding on probing.",
-    "caries": "Assess lesion depth and proximity to the pulp; correlate with visual examination, symptoms and caries risk.",
-    "cavity": "Assess lesion depth and proximity to the pulp; correlate with visual examination, symptoms and caries risk.",
-    "cyst": "Review lesion borders, size and relation to tooth apices; compare prior images and correlate with pulp tests.",
-    "fracture line": "Inspect the suspected line on the source image; correlate with bite testing, percussion, mobility and probing.",
-    "furcation": "Assess inter-radicular bone; correlate with clinical furcation probing and periodontal charting.",
-    "impacted": "Confirm tooth identity and eruption status; assess angulation, depth, root development and relation to adjacent anatomy.",
-    "impaction": "Confirm tooth identity and eruption status; assess angulation, depth, root development and relation to adjacent anatomy.",
-    "restoration": "Confirm the restoration; inspect its margins and contour, and assess adjacent tooth structure for caries.",
-    "root canal": "Confirm prior endodontic treatment; assess canal filling, periapical tissues and coronal seal, comparing prior images.",
-    "amalgam filling": "Inspect restoration margins and adjacent tooth structure; correlate with clinical examination.",
-    "composite filling": "Inspect restoration margins and adjacent tooth structure; correlate with clinical examination.",
-    "filling": "Inspect restoration margins and adjacent tooth structure; correlate with clinical examination.",
-    "crown": "Inspect crown margins, contour and adjacent tooth structure; correlate with clinical examination.",
-    "maxilla": "Confirm the marked anatomical region; assess any separate abnormality independently.",
-    "mandible": "Confirm the marked anatomical region; assess any separate abnormality independently.",
-    "nerve": "Verify the structure and course on the full-resolution image before clinical use.",
-    "no image augmentation techniques were applied.": "Verify the model class mapping; exclude this processing label from clinical findings.",
+    "abscess": "Flag the marked area for dentist review; record reported symptoms using clinic protocol and have relevant history ready.",
+    "attrition": "Have the patient's sensitivity and wear history ready; flag the marked teeth for the dentist.",
+    "bone loss": "Have prior radiographs and existing periodontal charting ready for dentist comparison.",
+    "calculus": "Have existing periodontal charting ready; flag the marked area for the dentist.",
+    "caries": "Record any reported pain or sensitivity and flag the marked area before the dentist's review.",
+    "cavity": "Record any reported pain or sensitivity and flag the marked area before the dentist's review.",
+    "cyst": "Have prior radiographs and relevant dental history ready for the dentist to compare.",
+    "fracture line": "Flag the area for dentist review; have symptom history and prior images ready.",
+    "furcation": "Have existing periodontal charting and prior radiographs ready for dentist review.",
+    "impacted": "Confirm the tooth with the dentist; have prior images and relevant symptom history ready.",
+    "impaction": "Confirm the tooth with the dentist; have prior images and relevant symptom history ready.",
+    "restoration": "Check the chart for restoration history; flag the marked area for dentist review.",
+    "root canal": "Check prior root-canal notes and pull earlier X-rays; ask the dentist whether follow-up is needed.",
+    "amalgam filling": "Check the chart for restoration history; have prior images ready for the dentist.",
+    "composite filling": "Check the chart for restoration history; have prior images ready for the dentist.",
+    "filling": "Check the chart for restoration history; have prior images ready for the dentist.",
+    "crown": "Check the chart for crown history; have prior radiographs ready for dentist review.",
+    "maxilla": "Have the full radiograph ready and ask the dentist to confirm the marked region.",
+    "mandible": "Have the full radiograph ready and ask the dentist to confirm the marked region.",
+    "nerve": "Flag the marked area for the dentist and have the full-resolution radiograph ready.",
+    "no image augmentation techniques were applied.": "Exclude this processing label from the handoff and flag it for model review.",
 }
 
 
@@ -36,10 +36,10 @@ def _assessment_guidance(class_label: str) -> str:
         return guidance
 
     if "implant" in normalized_label:
-        return "Assess crestal bone and peri-implant tissues; correlate with probing and prior images."
+        return "Have prior implant radiographs and existing periodontal charting ready for dentist review."
 
     return (
-        "Verify the model class; inspect the marked region on the full-resolution image and correlate with examination."
+        "Have the marked radiograph and relevant chart history ready; ask the dentist to confirm the finding."
     )
 
 

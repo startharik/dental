@@ -7,8 +7,6 @@ import { useResearchAutoPreference } from "@/hooks/use-research-auto-preference"
 export function ResearchAutoPreference() {
   const researchModeStatus = useResearchModeStatus();
   const preference = useResearchAutoPreference();
-  const providerName =
-    researchModeStatus.data?.provider === "groq" ? "Groq" : "Gemini";
   const isResearchReady = researchModeStatus.data?.enabled;
 
   return (
@@ -28,11 +26,11 @@ export function ResearchAutoPreference() {
           }}
           className="mt-0.5 size-4 shrink-0 accent-[#168a86]"
         />
-        <span>Automatically analyze completed studies with {providerName}</span>
+        <span>Automatically analyze completed studies with LePro AI</span>
       </label>
       <p className="mt-1 pl-6 text-[10px] leading-4 text-[#61758b]">
-        When enabled, completed radiographs and model findings are sent to{" "}
-        {providerName}. Use de-identified or demo images.
+        When enabled, completed radiographs and model findings are sent for
+        LePro AI analysis. Use de-identified or demo images.
       </p>
       {preference.storageError && (
         <p role="alert" className="mt-1 pl-6 text-[10px] text-[#9f3434]">
@@ -41,7 +39,7 @@ export function ResearchAutoPreference() {
       )}
       {!researchModeStatus.isLoading && !isResearchReady && (
         <p className="mt-1 pl-6 text-[10px] text-[#9f3434]">
-          {providerName} is not configured for this instance.
+          LePro AI analysis is not available for this instance.
         </p>
       )}
     </div>

@@ -172,9 +172,8 @@ class ResearchAnalysisService:
             raise HTTPException(
                 status_code=504,
                 detail=(
-                    f"{self.settings.research_provider.capitalize()} did not respond "
-                    "in time. No analysis was saved; retry later or review the image "
-                    "manually."
+                    "LePro AI did not respond in time. No analysis was saved; "
+                    "retry later or review the image manually."
                 ),
             ) from None
         except Exception as error:
@@ -187,9 +186,8 @@ class ResearchAnalysisService:
                 raise HTTPException(
                     status_code=429,
                     detail=(
-                        f"{self.settings.research_provider.capitalize()} is "
-                        "temporarily rate-limited. Wait before retrying; no "
-                        "analysis was saved."
+                        "LePro AI is temporarily busy. Wait before retrying; "
+                        "no analysis was saved."
                     ),
                 ) from None
             logger.error(
@@ -200,9 +198,8 @@ class ResearchAnalysisService:
             raise HTTPException(
                 status_code=502,
                 detail=(
-                    f"{self.settings.research_provider.capitalize()} could not return "
-                    "a valid structured research analysis. "
-                    "No analysis was saved; try again or review the image manually."
+                    "LePro AI could not complete this analysis. No analysis was "
+                    "saved; try again or review the image manually."
                 ),
             ) from None
 
