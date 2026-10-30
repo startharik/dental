@@ -100,11 +100,25 @@ export function useDicomDetection() {
             fileId: file.id,
             fileName: file.fileName,
           };
+          const diagnosticReport: DiagnosticReport = {
+            uncertainty_and_limitations:
+              "Recommended actions are clinician review prompts based on model labels.",
+            suggested_assessments: response.data.predictions.map(
+              (detection, index) => ({
+                detection_id: detection.detection_id,
+                suggestion:
+                  response.data.recommended_actions?.[index] ??
+                  "Inspect the marked region on the source image and correlate with examination.",
+              })
+            ),
+            generated_at: new Date().toISOString(),
+          };
 
           // Update to success state
           updateFileStatus(file.id, {
             status: "success",
             result,
+            diagnosticReport,
           });
 
           return result;

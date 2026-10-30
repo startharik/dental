@@ -78,7 +78,8 @@ Dobbe is a modern web application that leverages artificial intelligence to anal
 - **Clinical Review Workspace**: Detection summary, FDI odontogram, finding crops, linked radiograph viewer, overlay toggle, and class-specific clinical assessment matrix
 - **Dentist Review Draft**: Findings can be confirmed, modified, assigned a dentist-identified FDI tooth, marked not applicable, and annotated with observations; review drafts save only in the current browser
 - **Research Mode**: Optional Groq or Gemini vision analysis returns structured, multi-finding research hypotheses, differential considerations, investigations, and broad care-pathway categories for dentist discussion
-- **Explicit External-Processing Consent**: Research Mode is opt-in per analysis; only the image, model detections, image dimensions/modality, and structured tooth/label annotations are sent to the configured provider, not DICOM metadata or free-text notes
+- **Compact Research Findings**: Research results use short visual summaries, image crops, model-score and review-status badges; differential hypotheses and supporting details are available on demand
+- **Explicit External-Processing Consent**: Research Mode uses an opt-in preference saved in this browser; changing providers requires a fresh opt-in. When enabled, completed images are automatically sent with model detections, image dimensions/modality, and structured tooth/label annotations to the configured provider, not DICOM metadata or free-text notes
 - **Export Capabilities**: Print or download clinical review reports as PDFs
 
 ### 🩺 Clinical Review Aid
@@ -86,10 +87,10 @@ Dobbe is a modern web application that leverages artificial intelligence to anal
 - **Finding-Specific Review Actions**: Supported labels, including restorations, root canal treatment, and impaction, receive refreshable clinician next steps tied to each submitted detection
 - **Research Hypotheses**: Optional multimodal analysis considers the source radiograph, displayed and raw detections, and structured dentist-entered labels/tooth assignments; model predictions remain separate from LLM interpretations
 - **Research Limitations**: AI hypotheses are not diagnoses or treatment instructions. Care pathways are restricted to broad evaluation categories; no prescriptions, procedural instructions, or inferred tooth numbers are generated
-- **Literature Scope**: No external dental literature database is connected; the model must not invent citations, and the report discloses that literature was not retrieved
-- **Validation Status**: Neither the configured prompts nor Groq research interpretations are validated clinical protocols; a dentist must independently review the image and patient context
+- **Literature Scope**: No external dental literature database is connected; the model must not invent citations
+- **Validation Status**: Neither the configured prompts nor Groq/Gemini research interpretations are validated clinical protocols; a dentist must independently review the image and patient context
 - **Review Persistence**: Dentist-entered review drafts use browser local storage only; there is no authentication or server-side clinical record
-- **External Processing**: The selected provider receives image pixels only after per-analysis user consent and confirmation that the image is authorized and de-identified/test data; DICOM metadata and free-text dentist notes are excluded, but text burned into image pixels cannot be automatically removed
+- **External Processing**: The selected provider receives image pixels only when the persistent browser opt-in is enabled and the image is authorized and de-identified/test data; DICOM metadata and free-text dentist notes are excluded, but text burned into image pixels cannot be automatically removed
 - **Dentist Confirmation Required**: The impression draft is not saved or identity-verified and is not a final clinical record
 
 ### 📄 PDF Export Features
@@ -384,13 +385,15 @@ Returns whether the optional Groq- or Gemini-powered Research Mode is configured
 
 #### `POST /api/v1/research-analysis`
 
-Generate exploratory, structured research hypotheses from a de-identified/test image and its actual model outputs using the provider selected by `RESEARCH_PROVIDER`. The request must contain `share_consent: true`; the UI requires a per-analysis confirmation before sending.
+Generate exploratory, structured research hypotheses from a de-identified/test image and its actual model outputs using the provider selected by `RESEARCH_PROVIDER`. The request must contain `share_consent: true`; the UI requires a persistent, explicit browser opt-in before automatically sending completed studies.
 
 **External data**: The selected provider receives the image pixels, displayed and raw detections, image dimensions/modality, and structured dentist-entered labels/tooth assignments. DICOM metadata and free-text dentist notes are excluded. Burned-in identifiers in image pixels cannot be automatically removed.
 
 **Request**: JSON containing `predictions`, `raw_predictions`, `image_info`, optional `modality`, base64 `image_data_url` (PNG/JPEG), `dentist_annotations`, and `share_consent`.
 
 **Response**: `analysis` contains a separate LLM interpretation for each detection, differentials with supporting and missing evidence, investigations, broad care-pathway categories, follow-up, cross-finding patterns, and a combined interpretation. `model_predictions` preserves the original model detections separately. Model confidence values are copied from inference, not generated by the LLM.
+
+Gemini requests allow up to four minutes for a response because detailed multimodal analysis can take longer than a standard text request. To reduce generation time, the prompt requests concise, non-repetitive findings, and the output-token budget scales with the number of detections (up to 8,000 tokens). If the provider exceeds the timeout, the API returns `504 Gateway Timeout`; if Groq rate-limits a request, it returns `429 Too Many Requests`. In either case, no research analysis is saved, and the user can retry later. Concise class-specific dentist actions are returned with the initial detection response.
 
 ```json
 {

@@ -5,6 +5,7 @@ import os
 import logging
 
 from ..models.detection import (
+    Detection,
     DetectionResponse,
     DicomDetectionResponse,
     ErrorResponse,
@@ -124,6 +125,9 @@ async def detect_dental_conditions_dicom(
     file: UploadFile,
     inference_service: Annotated[InferenceService, Depends(get_inference_service)],
     settings: Annotated[Settings, Depends(get_settings)],
+    diagnostic_service: Annotated[
+        DiagnosticReportService, Depends(get_diagnostic_report_service)
+    ],
 ) -> DicomDetectionResponse:
     """
     Detect cavities and periapical lesions in an uploaded DICOM or PNG image
@@ -186,10 +190,22 @@ async def detect_dental_conditions_dicom(
                 )
             )
 
+        predictions = [
+            Detection.model_validate(prediction)
+            for prediction in inference_results.get("predictions", [])
+        ]
+        diagnostic_report = await diagnostic_service.generate_diagnostic_report(
+            predictions
+        )
+
         return DicomDetectionResponse(
-            predictions=inference_results.get("predictions", []),
+            predictions=predictions,
             metadata=metadata,
             image_info=image_info,
+            recommended_actions=[
+                assessment.suggestion
+                for assessment in diagnostic_report.suggested_assessments
+            ],
         )
 
     except HTTPException:
@@ -277,6 +293,7 @@ async def get_research_mode_status(
         400: {"model": ErrorResponse, "description": "Invalid research input"},
         413: {"model": ErrorResponse, "description": "Image too large"},
         502: {"model": ErrorResponse, "description": "External research provider failed"},
+        504: {"model": ErrorResponse, "description": "External research provider timed out"},
         503: {"model": ErrorResponse, "description": "Research Mode is disabled"},
     },
 )

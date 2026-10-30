@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import HTTPException
+import httpx
 from pydantic import SecretStr, ValidationError
 
 from app.core.config import Settings
@@ -14,7 +15,13 @@ from app.models.detection import (
     ResearchDentistAnnotation,
     ResearchNarrativePayload,
 )
-from app.services.research_service import ResearchAnalysisService
+from app.services.research_service import (
+    GEMINI_MAX_OUTPUT_TOKENS,
+    GEMINI_OUTPUT_TOKENS_BASE,
+    GEMINI_OUTPUT_TOKENS_PER_FINDING,
+    GEMINI_REQUEST_TIMEOUT_SECONDS,
+    ResearchAnalysisService,
+)
 
 
 def make_detection(detection_id: str, class_name: str) -> Detection:
@@ -101,13 +108,19 @@ def make_narrative() -> dict[str, object]:
 class ResearchAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
     def test_selected_provider_must_have_its_own_api_key(self) -> None:
         gemini_without_key = ResearchAnalysisService(
-            Settings(roboflow_api_key="test-key", research_provider="gemini")
+            Settings(
+                roboflow_api_key="test-key",
+                research_provider="gemini",
+                google_api_key=None,
+                groq_api_key=None,
+            )
         )
         groq_with_key = ResearchAnalysisService(
             Settings(
                 roboflow_api_key="test-key",
                 research_provider="groq",
                 groq_api_key=SecretStr("groq-test-key"),
+                google_api_key=None,
             )
         )
         self.assertFalse(gemini_without_key.is_enabled())
@@ -116,7 +129,9 @@ class ResearchAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_generation_preserves_model_score_and_uses_opted_in_image(self) -> None:
         settings = Settings(
             roboflow_api_key="test-key",
+            research_provider="groq",
             groq_api_key=SecretStr("groq-test-key"),
+            google_api_key=None,
         )
         service = ResearchAnalysisService(settings)
         fake_model = AsyncMock(
@@ -147,6 +162,7 @@ class ResearchAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
             roboflow_api_key="test-key",
             research_provider="gemini",
             google_api_key=SecretStr("rotated-test-key"),
+            groq_api_key=None,
         )
         service = ResearchAnalysisService(settings)
         fake_response = MagicMock(
@@ -171,7 +187,7 @@ class ResearchAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
         with patch(
             "app.services.research_service.httpx.AsyncClient",
             return_value=fake_client,
-        ):
+        ) as client_factory:
             analysis = await service.generate_analysis(make_request())
 
         self.assertEqual(analysis.model, "gemini-flash-latest")
@@ -189,8 +205,120 @@ class ResearchAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             body["generationConfig"]["responseMimeType"], "application/json"
         )
+        self.assertEqual(
+            body["generationConfig"]["maxOutputTokens"],
+            GEMINI_OUTPUT_TOKENS_BASE + GEMINI_OUTPUT_TOKENS_PER_FINDING,
+        )
         self.assertTrue(body["contents"][0]["parts"][1]["inlineData"]["data"])
         self.assertNotIn("patient_id", body["contents"][0]["parts"][0]["text"])
+        self.assertEqual(
+            client_factory.call_args.kwargs["timeout"].read,
+            GEMINI_REQUEST_TIMEOUT_SECONDS,
+        )
+
+    async def test_gemini_output_limit_scales_with_findings_and_is_capped(self) -> None:
+        settings = Settings(
+            roboflow_api_key="test-key",
+            research_provider="gemini",
+            google_api_key=SecretStr("rotated-test-key"),
+            groq_api_key=None,
+        )
+        service = ResearchAnalysisService(settings)
+        detections = [
+            make_detection(f"finding-{index}", "restoration")
+            for index in range(40)
+        ]
+        request = make_request().model_copy(
+            update={"predictions": detections, "raw_predictions": detections}
+        )
+        fake_response = MagicMock(
+            is_error=False,
+            json=MagicMock(
+                return_value={
+                    "candidates": [
+                        {
+                            "content": {
+                                "parts": [{"text": json.dumps({
+                                    **make_narrative(),
+                                    "findings": [
+                                        {
+                                            **make_narrative()["findings"][0],
+                                            "detection_id": detection.detection_id,
+                                        }
+                                        for detection in detections
+                                    ],
+                                })}]
+                            }
+                        }
+                    ]
+                }
+            ),
+        )
+        fake_client = AsyncMock()
+        fake_client.__aenter__.return_value = fake_client
+        fake_client.__aexit__.return_value = False
+        fake_client.post.return_value = fake_response
+
+        with patch(
+            "app.services.research_service.httpx.AsyncClient",
+            return_value=fake_client,
+        ):
+            await service.generate_analysis(request)
+
+        generation_config = fake_client.post.await_args.kwargs["json"][
+            "generationConfig"
+        ]
+        self.assertEqual(
+            generation_config["maxOutputTokens"],
+            GEMINI_MAX_OUTPUT_TOKENS,
+        )
+
+    async def test_provider_timeout_returns_gateway_timeout(self) -> None:
+        settings = Settings(
+            roboflow_api_key="test-key",
+            research_provider="gemini",
+            google_api_key=SecretStr("rotated-test-key"),
+            groq_api_key=None,
+        )
+        service = ResearchAnalysisService(settings)
+        fake_client = AsyncMock()
+        fake_client.__aenter__.return_value = fake_client
+        fake_client.__aexit__.return_value = False
+        fake_client.post.side_effect = httpx.ReadTimeout("provider timed out")
+
+        with patch(
+            "app.services.research_service.httpx.AsyncClient",
+            return_value=fake_client,
+        ):
+            with self.assertRaises(HTTPException) as exception_context:
+                await service.generate_analysis(make_request())
+
+        self.assertEqual(exception_context.exception.status_code, 504)
+        self.assertIn("did not respond in time", exception_context.exception.detail)
+
+    async def test_groq_rate_limit_returns_actionable_response(self) -> None:
+        class ProviderRateLimitError(Exception):
+            status_code = 429
+
+        settings = Settings(
+            roboflow_api_key="test-key",
+            research_provider="groq",
+            groq_api_key=SecretStr("groq-test-key"),
+            google_api_key=None,
+        )
+        service = ResearchAnalysisService(settings)
+        fake_model = AsyncMock(side_effect=ProviderRateLimitError())
+
+        with patch("app.services.research_service.ChatGroq") as chat_groq:
+            chat_groq.return_value.ainvoke = fake_model
+            with self.assertRaises(HTTPException) as exception_context:
+                await service.generate_analysis(make_request())
+
+        self.assertEqual(exception_context.exception.status_code, 429)
+        self.assertEqual(
+            exception_context.exception.detail,
+            "Groq is temporarily rate-limited. Wait before retrying; no analysis was saved.",
+        )
 
     def test_request_requires_explicit_consent(self) -> None:
         request = make_request().model_dump()
@@ -208,7 +336,9 @@ class ResearchAnalysisServiceTests(unittest.IsolatedAsyncioTestCase):
         service = ResearchAnalysisService(
             Settings(
                 roboflow_api_key="test-key",
+                research_provider="groq",
                 groq_api_key=SecretStr("groq-test-key"),
+                google_api_key=None,
             )
         )
         narrative = ResearchNarrativePayload.model_validate(make_narrative())

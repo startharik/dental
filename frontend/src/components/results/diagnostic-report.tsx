@@ -30,7 +30,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DetectionImagePreview } from "@/components/detection/detection-image-preview";
 import { useGenerateDiagnosticReport } from "@/hooks/use-diagnostic-report";
 import {
-  useGenerateResearchAnalysis,
   useResearchModeStatus,
 } from "@/hooks/use-research-analysis";
 import { getDetectionColor } from "@/lib/constants";
@@ -42,6 +41,7 @@ import type {
   Detection,
   DiagnosticReport,
   ResearchAnalysis,
+  ResearchAnalysisRunStatus,
   DicomMetadata,
   ImageInfo,
 } from "@/lib/types";
@@ -54,7 +54,9 @@ interface DiagnosticReportComponentProps {
   report?: DiagnosticReport;
   onReportGenerated?: (report: DiagnosticReport) => void;
   researchAnalysis?: ResearchAnalysis;
-  onResearchAnalysisGenerated?: (analysis: ResearchAnalysis) => void;
+  researchAnalysisStatus?: ResearchAnalysisRunStatus;
+  researchAnalysisError?: string;
+  onRetryResearchAnalysis?: () => void;
   onLocateFinding: (detectionId: string) => void;
   originalImageSrc?: string;
   fileName?: string;
@@ -141,7 +143,9 @@ export function DiagnosticReportComponent({
   report: externalReport,
   onReportGenerated,
   researchAnalysis,
-  onResearchAnalysisGenerated,
+  researchAnalysisStatus = "idle",
+  researchAnalysisError,
+  onRetryResearchAnalysis,
   onLocateFinding,
   originalImageSrc,
   fileName,
@@ -163,8 +167,6 @@ export function DiagnosticReportComponent({
   const [isExporting, setIsExporting] = useState(false);
   const generateReport = useGenerateDiagnosticReport();
   const researchModeStatus = useResearchModeStatus();
-  const generateResearchAnalysis = useGenerateResearchAnalysis();
-  const [researchConsent, setResearchConsent] = useState(false);
 
   const storageKey = useMemo(
     () =>
@@ -300,48 +302,6 @@ export function DiagnosticReportComponent({
         typeof error.response?.data.detail === "string"
           ? error.response.data.detail
           : "Failed to generate clinical assessment guidance. Check the backend logs.";
-      toast.error(message);
-    }
-  };
-
-  const handleGenerateResearchAnalysis = async () => {
-    if (!originalImageSrc || !researchConsent) return;
-    try {
-      const response = await generateResearchAnalysis.mutateAsync({
-        predictions,
-        raw_predictions: rawDetections,
-        image_info: imageInfo,
-        modality: metadata.modality,
-        image_data_url: originalImageSrc,
-        dentist_annotations: predictions.flatMap((detection) => {
-          const findingReview =
-            review.findings[detection.detection_id] ?? createFindingReview();
-          if (
-            findingReview.status === "awaiting_review" &&
-            !findingReview.modifiedLabel &&
-            !findingReview.toothNumber
-          ) {
-            return [];
-          }
-          return [
-            {
-              detection_id: detection.detection_id,
-              review_status: findingReview.status,
-              dentist_label: findingReview.modifiedLabel,
-              assigned_tooth: findingReview.toothNumber,
-            },
-          ];
-        }),
-        share_consent: true,
-      });
-      onResearchAnalysisGenerated?.(response.analysis);
-      toast.success("Research interpretation generated for dentist review.");
-    } catch (error) {
-      const message =
-        axios.isAxiosError<{ detail?: string }>(error) &&
-        typeof error.response?.data.detail === "string"
-          ? error.response.data.detail
-          : "Research analysis failed. No interpretation was saved.";
       toast.error(message);
     }
   };
@@ -889,12 +849,7 @@ export function DiagnosticReportComponent({
                   </Badge>
                 </div>
                 <p className="mt-1 text-[10px] leading-4 text-[#61758b]">
-                  {researchModeStatus.data?.provider === "gemini"
-                    ? "Gemini"
-                    : "Groq"}{" "}
-                  vision analysis of the source radiograph and the full
-                  detection set. Not clinically validated; hypotheses require
-                  independent dentist review.
+                  AI-generated research hypotheses for dentist review.
                 </p>
               </div>
             </div>
@@ -907,17 +862,6 @@ export function DiagnosticReportComponent({
           </div>
 
           <div className="space-y-3 p-4">
-            <div
-              role="note"
-              className="rounded-lg border border-[#ead9ad] bg-[#fff9e9] p-3 text-[10px] leading-4 text-[#765b1f]"
-            >
-              Research hypotheses are not diagnoses or treatment instructions.
-              Do not use this output alone to make care decisions. No literature
-              database is connected, and no citations are generated. Image pixels
-              are sent to Groq only after consent; burned-in identifiers cannot
-              be automatically removed.
-            </div>
-
             {researchModeStatus.isLoading && (
               <p className="text-[10px] text-[#718198]">
                 Checking Research Mode configuration...
@@ -949,74 +893,71 @@ export function DiagnosticReportComponent({
               </p>
             )}
 
-            <label className="flex cursor-pointer items-start gap-2 text-[10px] leading-4 text-[#465b72]">
-              <input
-                type="checkbox"
-                checked={researchConsent}
-                onChange={(event) => setResearchConsent(event.target.checked)}
-                className="mt-0.5 size-4 shrink-0 accent-[#168a86]"
-              />
-              <span>
-                I confirm this is an authorized, de-identified/test image and
-                consent to sending its pixels, model detections, image
-                dimensions/modality, and structured tooth/label annotations to
-                {researchModeStatus.data?.provider === "gemini"
-                  ? "Gemini"
-                  : "Groq"}{" "}
-                for exploratory analysis. Patient metadata and free-text
-                dentist notes are not sent.
-              </span>
-            </label>
-
-            <Button
-              type="button"
-              size="sm"
-              className="clinical-report-no-print bg-[#147e88] text-white hover:bg-[#116a73]"
-              disabled={
-                !researchConsent ||
-                !researchModeStatus.data?.enabled ||
-                !originalImageSrc ||
-                predictions.length === 0 ||
-                generateResearchAnalysis.isPending
-              }
-              onClick={() => void handleGenerateResearchAnalysis()}
-            >
-              {generateResearchAnalysis.isPending ? (
+            {!researchAnalysis && researchAnalysisStatus === "pending" && (
+              <p
+                role="status"
+                className="flex items-center gap-2 text-[10px] text-[#61758b]"
+              >
                 <RefreshCw className="size-3.5 animate-spin" />
-              ) : (
-                <BrainCircuit className="size-3.5" />
-              )}
-              {researchAnalysis
-                ? "Regenerate research analysis"
-                : "Generate research analysis"}
-            </Button>
-
-            {generateResearchAnalysis.isError && (
-              <p role="alert" className="text-[10px] text-[#9f3434]">
-                {axios.isAxiosError<{ detail?: string }>(
-                  generateResearchAnalysis.error
-                ) &&
-                typeof generateResearchAnalysis.error.response?.data.detail ===
-                  "string"
-                  ? generateResearchAnalysis.error.response.data.detail
-                  : "Research analysis failed. No interpretation was saved."}
+                {researchModeStatus.data?.provider === "groq"
+                  ? "Groq"
+                  : "Gemini"}{" "}
+                is analyzing this radiograph and its findings...
               </p>
+            )}
+            {!researchAnalysis && researchAnalysisStatus === "idle" && (
+              <p className="text-[10px] text-[#61758b]">
+                Enable automatic research analysis in the workspace to generate
+                this interpretation when detection completes.
+              </p>
+            )}
+            {!researchAnalysis && researchAnalysisStatus === "error" && (
+              <div
+                role="alert"
+                className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-[#9f3434]"
+              >
+                <span>
+                  {researchAnalysisError ?? "Research analysis failed."}
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!originalImageSrc}
+                  onClick={onRetryResearchAnalysis}
+                >
+                  Retry analysis
+                </Button>
+              </div>
             )}
 
             {researchAnalysis && (
               <div className="space-y-3 border-t border-[#e7eef4] pt-4">
                 <div className="rounded-lg border border-[#d9e7ee] bg-[#f7fbfd] p-3">
-                  <h4 className="text-xs font-bold text-[#142b4a]">
-                    Combined clinical interpretation · AI-generated hypothesis
-                  </h4>
-                  <p className="mt-1 whitespace-pre-line text-[10px] leading-5 text-[#465b72]">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-xs font-bold text-[#142b4a]">
+                      Overall interpretation
+                    </h4>
+                    <span className="rounded-full bg-[#e7f5f4] px-2 py-0.5 text-[9px] font-semibold text-[#176b76]">
+                      AI hypothesis
+                    </span>
+                  </div>
+                  <p className="mt-1 line-clamp-3 whitespace-pre-line text-[10px] leading-5 text-[#465b72]">
                     {researchAnalysis.combined_clinical_interpretation}
                   </p>
                   {researchAnalysis.cross_finding_patterns.length > 0 && (
-                    <ResearchTextList
-                      title="Cross-finding patterns to review"
-                      items={researchAnalysis.cross_finding_patterns}
-                    />
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {researchAnalysis.cross_finding_patterns.map(
+                        (pattern, patternIndex) => (
+                          <span
+                            key={`pattern-${patternIndex}`}
+                            className="max-w-full rounded-full border border-[#d9e7ee] bg-white px-2.5 py-1 text-[9px] leading-4 text-[#53677e]"
+                          >
+                            {pattern}
+                          </span>
+                        )
+                      )}
+                    </div>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -1054,9 +995,6 @@ export function DiagnosticReportComponent({
                     );
                   })}
                 </div>
-                <p className="text-[9px] leading-4 text-[#718198]">
-                  {researchAnalysis.source_scope} {researchAnalysis.limitations}
-                </p>
               </div>
             )}
           </div>
@@ -1075,8 +1013,7 @@ export function DiagnosticReportComponent({
                 Clinical assessment matrix
               </h3>
               <p className="mt-1 text-[10px] text-[#78889c]">
-                Recommended clinician next steps for reviewing each model
-                finding. This AI output is not a diagnosis or treatment plan.
+                Recommended next steps for reviewing each model finding.
               </p>
             </div>
             <Button
@@ -1183,9 +1120,7 @@ export function DiagnosticReportComponent({
                           </p>
                         ) : (
                           <span className="text-[#8291a7]">
-                            Generate configured clinician next steps. No
-                            diagnosis is inferred from the model label or
-                            coordinates.
+                            No recommended action is available for this finding.
                           </span>
                         )}
                         {assessment && (
@@ -1548,78 +1483,96 @@ function ResearchFindingCard({
   onLocate: () => void;
 }) {
   return (
-    <details className="group rounded-lg border border-[#dfe6ed] bg-white">
+    <details className="group rounded-xl border border-[#dfe6ed] bg-white shadow-[0_1px_2px_rgba(20,43,74,0.03)]">
       <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 p-3 [&::-webkit-details-marker]:hidden">
-        <span className="flex items-center gap-2 text-[11px] font-semibold text-[#142b4a]">
+        <span className="flex min-w-0 items-center gap-2 text-[11px] font-semibold text-[#142b4a]">
           <span
             className="flex size-5 items-center justify-center rounded-full text-[8px] font-bold text-white"
             style={{ backgroundColor: getDetectionColor(detection.class_id) }}
           >
             {String(index + 1).padStart(2, "0")}
           </span>
-          {finding.finding_name} · {finding.possible_diagnosis}
+          <span className="min-w-0">
+            <span className="block truncate">{finding.finding_name}</span>
+            <span className="mt-0.5 block truncate text-[10px] font-normal text-[#61758b]">
+              {finding.possible_diagnosis}
+            </span>
+          </span>
         </span>
-        <span className="text-[9px] tabular-nums text-[#718198]">
-          Model score {(detection.confidence * 100).toFixed(1)}% ·{" "}
-          {review.toothNumber
-            ? `FDI ${review.toothNumber} · dentist-entered`
-            : "Tooth not identified"}
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-[#f1f5f9] px-2 py-1 text-[9px] font-medium tabular-nums text-[#52657a]">
+            {(detection.confidence * 100).toFixed(1)}% model score
+          </span>
+          <span
+            className={`rounded-full border px-2 py-1 text-[9px] font-medium ${STATUS_STYLES[review.status]}`}
+          >
+            {STATUS_LABELS[review.status]}
+          </span>
+          <span className="text-[9px] text-[#718198]">
+            {review.toothNumber ? `FDI ${review.toothNumber}` : "Tooth unknown"}
+          </span>
+          <span className="text-[9px] font-semibold text-[#13817e]">
+            <span className="group-open:hidden">View</span>
+            <span className="hidden group-open:inline">Close</span>
+          </span>
         </span>
       </summary>
-      <div className="grid gap-3 border-t border-[#edf1f5] p-3 lg:grid-cols-[180px_minmax(0,1fr)]">
-        <div>
+      <div className="grid gap-3 border-t border-[#edf1f5] bg-[#fbfcfd] p-3 sm:grid-cols-[150px_minmax(0,1fr)]">
+        <div className="space-y-1">
           <FindingCrop
             src={imageSrc}
             detection={detection}
             imageWidth={imageWidth}
             imageHeight={imageHeight}
           />
-          <p className="mt-1 text-[9px] leading-4 text-[#718198]">
-            Source-image crop · box center {detection.x.toFixed(1)},{" "}
-            {detection.y.toFixed(1)} px · {detection.width} ×{" "}
-            {detection.height} px
-          </p>
           <button
             type="button"
-            className="clinical-report-no-print mt-1 text-[9px] font-semibold text-[#13817e] hover:underline"
+            className="clinical-report-no-print text-[9px] font-semibold text-[#13817e] hover:underline"
             onClick={onLocate}
           >
-            Locate on full radiograph
+            View on radiograph
           </button>
         </div>
-        <div className="space-y-2.5 text-[10px] leading-4 text-[#53677e]">
-          <ResearchTextList
-            title="Anatomical location"
-            items={[finding.anatomical_location]}
-          />
-          <ResearchTextList
-            title="AI interpretation"
-            items={[finding.ai_interpretation]}
-          />
-          <div>
-            <h5 className="font-semibold text-[#344861]">
-              Possible diagnosis · unconfirmed hypothesis
-            </h5>
-            <p className="mt-0.5">{finding.possible_diagnosis}</p>
+        <div className="min-w-0 space-y-3 text-[10px] leading-4 text-[#53677e]">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <ResearchSummaryItem
+              label="Location"
+              value={finding.anatomical_location}
+            />
+            <ResearchSummaryItem
+              label="Clinical significance"
+              value={finding.clinical_significance}
+            />
           </div>
+          <ResearchSummaryItem
+            label="Interpretation"
+            value={finding.ai_interpretation}
+            clamp
+          />
+          <details className="group/details rounded-lg border border-[#e5ebf1] bg-white">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-[10px] font-semibold text-[#344861] [&::-webkit-details-marker]:hidden">
+              <span>More clinical details</span>
+              <span className="text-[9px] font-medium text-[#13817e]">
+                <span className="group-open/details:hidden">Expand</span>
+                <span className="hidden group-open/details:inline">Collapse</span>
+              </span>
+            </summary>
+            <div className="space-y-3 border-t border-[#edf1f5] p-3">
           {finding.differential_diagnoses.length > 0 && (
             <div>
-              <h5 className="font-semibold text-[#344861]">
-                Differential hypotheses
-              </h5>
+              <h5 className="font-semibold text-[#344861]">Differentials</h5>
               <ul className="mt-1 space-y-1">
                 {finding.differential_diagnoses.map((item, differentialIndex) => (
                   <li
                     key={`${finding.detection_id}-diff-${differentialIndex}`}
-                    className="rounded-md bg-[#f7f9fb] p-2"
+                    className="rounded-md bg-[#f7f9fb] px-2.5 py-2"
                   >
                     <span className="font-semibold">{item.diagnosis}</span>
-                    <span className="block">
-                      Supporting evidence: {item.supporting_evidence}
+                    <span className="mt-0.5 block text-[#63768a]">
+                      {item.supporting_evidence}
                     </span>
-                    <span className="block">
-                      Missing or contradictory evidence:{" "}
-                      {item.evidence_against_or_missing}
+                    <span className="mt-0.5 block text-[#8291a3]">
+                      To clarify: {item.evidence_against_or_missing}
                     </span>
                   </li>
                 ))}
@@ -1627,35 +1580,56 @@ function ResearchFindingCard({
             </div>
           )}
           <ResearchTextList
-            title="Clinical significance"
-            items={[finding.clinical_significance]}
-          />
-          <ResearchTextList
-            title="Recommended investigations for dentist consideration"
+            title="Investigations"
             items={finding.recommended_investigations}
           />
           <ResearchTextList
-            title="Potential care pathways · dentist discussion only"
+            title="Potential care pathways"
             items={finding.potential_treatment_options}
           />
-          <ResearchTextList title="Follow-up considerations" items={[finding.follow_up]} />
+          <ResearchTextList title="Follow-up" items={[finding.follow_up]} />
           <ResearchTextList
-            title="Evidence and limitations"
+            title="Evidence"
             items={finding.evidence_and_limitations}
           />
           <ResearchTextList
-            title="Comparison with manual annotations · unverified"
+            title="Dentist annotation comparison"
             items={[finding.dentist_annotation_comparison]}
           />
           {finding.related_detection_ids.length > 0 && (
             <ResearchTextList
-              title="Related detection IDs"
+              title="Related findings"
               items={finding.related_detection_ids}
             />
           )}
+            </div>
+          </details>
         </div>
       </div>
     </details>
+  );
+}
+
+function ResearchSummaryItem({
+  label,
+  value,
+  clamp = false,
+}: {
+  label: string;
+  value: string;
+  clamp?: boolean;
+}) {
+  return (
+    <div className="min-w-0 rounded-lg bg-white px-3 py-2">
+      <h5 className="text-[9px] font-semibold uppercase tracking-wide text-[#8492a3]">
+        {label}
+      </h5>
+      <p
+        className={`mt-1 whitespace-pre-line text-[10px] leading-4 text-[#53677e] ${clamp ? "line-clamp-2" : ""}`}
+      >
+        {value}
+      </p>
+    </div>
   );
 }
 

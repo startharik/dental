@@ -49,6 +49,7 @@ export interface DicomDetectionResponse {
   predictions: Detection[];
   metadata: DicomMetadata;
   image_info: ImageInfo;
+  recommended_actions?: string[];
 }
 
 export interface DicomDetectionResult extends DicomDetectionResponse {
@@ -140,9 +141,11 @@ export interface ResearchAnalysis {
 
 export interface ResearchModeStatus {
   enabled: boolean;
-  provider: string;
+  provider: "groq" | "gemini";
   model: string;
 }
+
+export type ResearchAnalysisRunStatus = "idle" | "pending" | "error" | "complete";
 
 export interface ResearchAnalysisRequest {
   predictions: Detection[];

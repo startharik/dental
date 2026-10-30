@@ -19,7 +19,7 @@ import type {
   Detection,
   DetectionProgress,
   DiagnosticReport,
-  ResearchAnalysis,
+  ResearchAnalysisRunStatus,
 } from "@/lib/types";
 import { deduplicateDetections } from "@/lib/utils";
 import { getDetectionColor } from "@/lib/constants";
@@ -30,17 +30,18 @@ interface ResultCardProps {
   fileState: DetectionProgress["files"][number];
   fileData?: ConvertedDicomData;
   onReportGenerated?: (fileId: string, report: DiagnosticReport) => void;
-  onResearchAnalysisGenerated?: (
-    fileId: string,
-    analysis: ResearchAnalysis
-  ) => void;
+  researchAnalysisStatus?: ResearchAnalysisRunStatus;
+  researchAnalysisError?: string;
+  onRetryResearchAnalysis?: () => void;
 }
 
 export function ResultCard({
   fileState,
   fileData,
   onReportGenerated,
-  onResearchAnalysisGenerated,
+  researchAnalysisStatus = "idle",
+  researchAnalysisError,
+  onRetryResearchAnalysis,
 }: ResultCardProps) {
   const [activeView, setActiveView] = useState("analysis");
   const [selectedDetectionId, setSelectedDetectionId] = useState<
@@ -327,12 +328,9 @@ export function ResultCard({
                       report={fileState.diagnosticReport}
                       onReportGenerated={handleReportGenerated}
                       researchAnalysis={fileState.researchAnalysis}
-                      onResearchAnalysisGenerated={(analysis) =>
-                        onResearchAnalysisGenerated?.(
-                          fileState.fileId,
-                          analysis
-                        )
-                      }
+                      researchAnalysisStatus={researchAnalysisStatus}
+                      researchAnalysisError={researchAnalysisError}
+                      onRetryResearchAnalysis={onRetryResearchAnalysis}
                       originalImageSrc={fileData?.dataUrl}
                       fileName={fileState.fileName}
                       onLocateFinding={(detectionId) => {

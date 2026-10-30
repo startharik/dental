@@ -23,11 +23,15 @@ from ..models.detection import (
 logger = logging.getLogger(__name__)
 
 MAX_RESEARCH_IMAGE_BYTES = 14 * 1024 * 1024
+GEMINI_REQUEST_TIMEOUT_SECONDS = 240.0
+GEMINI_MAX_OUTPUT_TOKENS = 8000
+GEMINI_OUTPUT_TOKENS_PER_FINDING = 256
+GEMINI_OUTPUT_TOKENS_BASE = 512
 
 _SYSTEM_PROMPT = """You are an AI research assistant reviewing dental radiographs.
 This is an exploratory research prototype, not a medical device or clinical
-decision-maker. Return uncertain research hypotheses, not confirmed diagnoses
-or instructions to treat a patient.
+decision-maker. Return concise, uncertain research hypotheses, not confirmed
+diagnoses or instructions to treat a patient.
 
 Use the supplied radiograph as visual evidence and the supplied detection list
 as model output. A detection label and model confidence are not ground truth or
@@ -55,7 +59,10 @@ Do not invent literature references, citations, or external sources. No
 literature retrieval is available. If model output cannot be reconciled with
 the image, say so plainly. Return only a single JSON object matching the
 provided schema. The application adds model confidence from the source
-detections; do not estimate or alter it."""
+detections; do not estimate or alter it. Keep each narrative field to one or
+two concise sentences, include at most two differentials and three
+investigations per finding, and avoid repeating details across findings.
+Prioritize image-supported evidence over exhaustive discussion."""
 
 
 class ResearchAnalysisService:
@@ -127,7 +134,9 @@ class ResearchAnalysisService:
             "provided model output. Do not use or request patient-identifying "
             "metadata. Use the exact detection_id values in the input. Return "
             "one finding for each displayed detection, once each, and no "
-            "invented IDs. The response schema is:\n"
+            "invented IDs. Keep the entire response compact while preserving "
+            "the key evidence, uncertainty, differentials, and dentist-directed "
+            "next steps. The response schema is:\n"
             f"{json.dumps(schema, separators=(',', ':'))}\n\n"
             "Input context:\n"
             f"{json.dumps(input_context, separators=(',', ':'))}"
@@ -135,7 +144,14 @@ class ResearchAnalysisService:
         try:
             if self.settings.research_provider == "gemini":
                 response_text = await self._generate_gemini_response(
-                    user_text, request.image_data_url
+                    user_text,
+                    request.image_data_url,
+                    max_output_tokens=min(
+                        GEMINI_MAX_OUTPUT_TOKENS,
+                        GEMINI_OUTPUT_TOKENS_BASE
+                        + GEMINI_OUTPUT_TOKENS_PER_FINDING
+                        * len(request.predictions),
+                    ),
                 )
             else:
                 response_text = await self._generate_groq_response(
@@ -147,7 +163,35 @@ class ResearchAnalysisService:
             return self._build_analysis(narrative, request.predictions)
         except HTTPException:
             raise
+        except httpx.TimeoutException as error:
+            logger.warning(
+                "%s research analysis timed out (%s)",
+                self.settings.research_provider,
+                type(error).__name__,
+            )
+            raise HTTPException(
+                status_code=504,
+                detail=(
+                    f"{self.settings.research_provider.capitalize()} did not respond "
+                    "in time. No analysis was saved; retry later or review the image "
+                    "manually."
+                ),
+            ) from None
         except Exception as error:
+            if getattr(error, "status_code", None) == 429:
+                logger.warning(
+                    "%s research analysis rate limited (%s)",
+                    self.settings.research_provider,
+                    type(error).__name__,
+                )
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        f"{self.settings.research_provider.capitalize()} is "
+                        "temporarily rate-limited. Wait before retrying; no "
+                        "analysis was saved."
+                    ),
+                ) from None
             logger.error(
                 "%s research analysis failed (%s)",
                 self.settings.research_provider,
@@ -193,7 +237,10 @@ class ResearchAnalysisService:
         return self._response_text(response.content)
 
     async def _generate_gemini_response(
-        self, user_text: str, image_data_url: str
+        self,
+        user_text: str,
+        image_data_url: str,
+        max_output_tokens: int,
     ) -> str:
         if self.settings.google_api_key is None:
             raise RuntimeError("The configured Gemini key is missing.")
@@ -222,11 +269,14 @@ class ResearchAnalysisService:
             ],
             "generationConfig": {
                 "temperature": 0,
-                "maxOutputTokens": 8000,
+                "maxOutputTokens": max_output_tokens,
                 "responseMimeType": "application/json",
             },
         }
-        timeout = httpx.Timeout(90.0, connect=10.0)
+        timeout = httpx.Timeout(
+            GEMINI_REQUEST_TIMEOUT_SECONDS,
+            connect=10.0,
+        )
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
                 endpoint,

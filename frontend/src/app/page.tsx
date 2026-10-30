@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { DicomDropzone } from "@/components/dicom/dicom-dropzone";
 import { PredictionResults } from "@/components/results/prediction-results";
+import { ResearchAutoPreference } from "@/components/results/research-auto-preference";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -194,6 +195,7 @@ export default function Home() {
                 </span>
               </div>
               <div className="p-4 sm:p-6">
+                <ResearchAutoPreference />
                 <DicomDropzone
                   dicomDetectionMutation={dicomDetectionMutation}
                   onPredict={handlePredict}
@@ -228,24 +230,21 @@ export default function Home() {
                   dentist-reviewed impression.
                 </p>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={dicomDetectionMutation.isPending}
-                onClick={startNewAnalysis}
-              >
-                <ScanLine className="size-4" />
-                New Analysis
-              </Button>
+              <div className="flex flex-col gap-2 sm:items-end">
+                <ResearchAutoPreference />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={dicomDetectionMutation.isPending}
+                  onClick={startNewAnalysis}
+                >
+                  <ScanLine className="size-4" />
+                  New Analysis
+                </Button>
+              </div>
             </div>
 
-            {hasAnalysis ? (
-              <PredictionResults
-                detectionProgress={detectionProgress}
-                onReportGenerated={updateDiagnosticReport}
-                onResearchAnalysisGenerated={updateResearchAnalysis}
-              />
-            ) : (
+            {!hasAnalysis && (
               <div className="rounded-2xl border border-dashed border-[#d7e1eb] bg-white px-5 py-12 text-center">
                 <p className="text-sm font-semibold text-[#263b55]">
                   No analysis is available
@@ -260,6 +259,22 @@ export default function Home() {
               </div>
             )}
           </section>
+        )}
+
+        {hasAnalysis && (
+          <div
+            className={
+              screen === "analysis-workspace"
+                ? "mt-5"
+                : "mt-5 hidden"
+            }
+          >
+            <PredictionResults
+              detectionProgress={detectionProgress}
+              onReportGenerated={updateDiagnosticReport}
+              onResearchAnalysisGenerated={updateResearchAnalysis}
+            />
+          </div>
         )}
 
         <footer className="mt-10 flex flex-col gap-2 border-t border-[#e3e9f0] pt-5 text-[11px] text-[#94a3b8] sm:flex-row sm:items-center sm:justify-between">

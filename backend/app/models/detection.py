@@ -72,6 +72,7 @@ class DicomDetectionResponse(BaseModel):
     predictions: List[Detection]
     metadata: DicomMetadata
     image_info: ImageInfo
+    recommended_actions: List[str] = Field(default_factory=list)
 
 
 class ErrorResponse(BaseModel):
@@ -155,7 +156,7 @@ class ResearchAnalysisRequest(BaseModel):
         default_factory=list, max_length=100
     )
     share_consent: bool = Field(
-        description="Explicit confirmation to send a de-identified/test image to Groq"
+        description="Explicit consent to send a de-identified/test image to the selected external provider"
     )
 
     @field_validator("image_data_url")
@@ -191,9 +192,9 @@ class ResearchModeStatus(BaseModel):
 
 
 class ResearchDifferential(BaseModel):
-    diagnosis: str
-    supporting_evidence: str
-    evidence_against_or_missing: str
+    diagnosis: str = Field(max_length=160)
+    supporting_evidence: str = Field(max_length=240)
+    evidence_against_or_missing: str = Field(max_length=240)
 
 
 ResearchTreatmentCategory = Literal[
@@ -210,23 +211,25 @@ ResearchTreatmentCategory = Literal[
 
 class ResearchFindingNarrative(BaseModel):
     detection_id: str
-    anatomical_location: str
-    possible_diagnosis: str
-    differential_diagnoses: List[ResearchDifferential]
-    ai_interpretation: str
-    clinical_significance: str
-    recommended_investigations: List[str]
-    potential_treatment_options: List[ResearchTreatmentCategory]
-    follow_up: str
-    evidence_and_limitations: List[str]
-    related_detection_ids: List[str]
-    dentist_annotation_comparison: str
+    anatomical_location: str = Field(max_length=160)
+    possible_diagnosis: str = Field(max_length=240)
+    differential_diagnoses: List[ResearchDifferential] = Field(max_length=2)
+    ai_interpretation: str = Field(max_length=500)
+    clinical_significance: str = Field(max_length=320)
+    recommended_investigations: List[str] = Field(max_length=3)
+    potential_treatment_options: List[ResearchTreatmentCategory] = Field(
+        max_length=4
+    )
+    follow_up: str = Field(max_length=320)
+    evidence_and_limitations: List[str] = Field(max_length=3)
+    related_detection_ids: List[str] = Field(max_length=100)
+    dentist_annotation_comparison: str = Field(max_length=240)
 
 
 class ResearchNarrativePayload(BaseModel):
     findings: List[ResearchFindingNarrative]
-    combined_clinical_interpretation: str
-    cross_finding_patterns: List[str]
+    combined_clinical_interpretation: str = Field(max_length=1000)
+    cross_finding_patterns: List[str] = Field(max_length=4)
 
 
 class ResearchFindingAnalysis(ResearchFindingNarrative):
